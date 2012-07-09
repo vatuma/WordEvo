@@ -1,0 +1,18 @@
+settings =
+{
+    iphone =
+    {
+        plist =
+        {
+            UIAppFonts =
+            {
+                "Harrowprint.ttf"
+            }
+        },
+    },
+
+    orientation =
+    {
+        default = "portrait",
+    },
+}
