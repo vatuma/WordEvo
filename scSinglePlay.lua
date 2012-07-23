@@ -6,77 +6,709 @@
 -- To change this template use File | Settings | File Templates.
 --
 
+require("Keyboard");
+
 local storyboard = require("storyboard");
 local scene = storyboard.newScene();
 
 local ui = require("ui")
+local values = require("values");
+local sqlite = require("sqlite3");
+local preference = require("save_and_load_library_from_satheesh");
 
-local language = "en";
-local mode = "";
+local receiveButtonEvents = false;
+
+local cell = values.cell;
+local scale = values.scale;
+
+local btn_play;
+
+local path_main = system.pathForFile("main.sqlite", system.DocumentsDirectory);
+local db_main;
+
+local function dbInit()
+    print("scSinglePlay", "dbInit");
+
+    db_main = sqlite.open(path_main);
+end
+
+-- get words for play depend on game type
+local function getPlayWords()
+    local start, finish, error = "", "", "";
+    local type = preference.getValue("type") or "type_random";
+
+    if (type == "type_random") then
+
+        local count = preference.getValue("count") or "count_3";
+        local wherecount = "";
+
+        if count == "count_3" then
+            wherecount = 3;
+        elseif count == "count_4" then
+            wherecount = 4;
+        elseif count == "count_5" then
+            wherecount = 5;
+        else
+            wherecount = math.random(3, 5);
+        end
+
+        local sql = "SELECT * FROM dict WHERE length=" .. wherecount .. ";";
+        local db_words = sqlite.open(system.pathForFile(values.db_name[values.game_language], system.ResourceDirectory));
+
+        local dict = {};
+        for row in db_words:nrows(sql) do
+            dict[#dict + 1] = row.word:lower();
+        end
+
+        local function startFinish()
+            local sp = math.random(1, #dict);
+            local start = dict[sp];
+
+            local fp = math.random(1, #dict);
+            while (sp == fp) do
+                fp = math.random(1, #dict);
+            end
+            local finish = dict[fp];
+
+            return start, finish;
+        end
+
+        start, finish = startFinish();
+
+        print("random game", start, finish);
+
+        while (values.getLevel{start = start, finish = finish} == 0) do
+            start, finish = startFinish();
+            print("random game", start, finish);
+        end
+
+        print("random game", start, finish);
+
+    elseif (type == "type_interest") then
+
+        start = preference.getValue("start_interest") or "";
+        finish = preference.getValue("finish_interest") or "";
+
+    elseif (type == "type_own") then
+
+        start = preference.getValue("start_own") or "";
+        finish = preference.getValue("finish_own") or "";
+
+        -- check possibility to construct a chain
+        if (values.getLevel{start = start, finish = finish}) then
+        else
+            error = "chain construct is impossible";
+        end;
+    end
+
+    return start, finish, error;
+end
 
 local function onBtnPlayRelease()
-    local options =
-    {
-        params = {startWord = "main", finishWord = "over"},
-    }
+    print("scSinglePlay", "onBtnPlayRelease", receiveButtonEvents);
 
-    storyboard.gotoScene("scPlay", options);
+    if receiveButtonEvents == false then
+        return false;
+    end;
+
+    local start, finish, error = getPlayWords();
+
+    if (error ~= "") then
+        -- toast about error
+        print(error);
+    else
+        local options =
+        {
+            params = {
+                start = start,
+                finish = finish,
+                gametype = values.type_singleplay,
+            }
+        }
+
+        storyboard.gotoScene("scPlay", options);
+    end
 
     return true;
 end
 
-local function onBtnRandomRelease(event)
-    mode = "random";
-    print(mode);
+-- call interest words selection
+local function onBtnSelectRelease()
+    if receiveButtonEvents == false then
+        return false;
+    end;
+
+    storyboard.gotoScene("scSelectWords");
 
     return true;
+end
+
+-- call back button
+local function onBackBtn(event)
+    if receiveButtonEvents == false then
+        return false;
+    end;
+
+    if event.phase == "ended" then
+        storyboard.gotoScene("scStart");
+    end
+
+    return true;
+end
+
+-- visible part for select type of game
+local function selectModule(params)
+    local typeW;
+    local typeH;
+
+    local countW;
+    local countH;
+
+    local buttonW;
+    local buttonH;
+
+    local sm = display.newGroup();
+
+    -- define sizes of images
+    local countW, countH = values.getImageSizes("images/o_3.png");
+    local typeW, typeH = values.getImageSizes("images/type_random.png");
+    local buttonW, buttonH = values.getImageSizes("images/btn_border_1.png");
+
+    -- create single image
+    local function singleImage(params)
+        local name = params.name;
+        local v = values.buttons[name];
+
+        local si = display.newGroup();
+
+        function si:setDefault(default)
+            self.over.isVisible = default;
+            self.default.isVisible = not default;
+        end
+
+        local function onEvent(event)
+            local target = event.target;
+
+            if ("ended" == event.phase) then
+                -- type selected
+                if (string.match(target.name, "type") ~= nil) then
+                    target.parent:selectType(target.name);
+                    target.parent.parent.detailsline:selectType();
+                -- count selected
+                elseif (string.match(target.name, "count") ~= nil) then
+                    target.parent.parent:selectCount(target.name);
+                end
+            end
+
+            return true;
+        end
+
+        -- name of image for searching
+        si.name = params.name;
+        si.comment = values.getText(v);
+
+        si.x = (v.x or 0) * scale + display.screenOriginX;
+        si.y = (v.y or 0) * scale + display.screenOriginY;
+
+        local width = params.width or 100;
+        local height = params.height or 100;
+
+        si.default = display.newImage(v.default);
+        si.default.width = width;
+        si.default.height = height;
+        si.default:setReferencePoint(display.TopLeftReferencePoint);
+        si.default.x = 0;
+        si.default.y = 0;
+        si:insert(si.default);
+
+        si.over = display.newImage(v.over);
+        si.over.width = width;
+        si.over.height = height;
+        si.over:setReferencePoint(display.TopLeftReferencePoint);
+        si.over.x = 0;
+        si.over.y = 0;
+        si:insert(si.over);
+
+        si:addEventListener("touch", onEvent);
+
+        return si;
+    end
+
+    -- type of game selection
+    local function typeline(params)
+        local v, d, s, name;
+
+        local tl = display.newGroup();
+
+        function tl:selectType(name)
+            for k, v in pairs(self.names) do
+                if (k == name) then
+                    preference.save{type = name};
+
+                    self.parent.type = name;
+
+                    self:remove(self.comment);
+                    self.comment = ui.myText{name = "type_comment", refPoint = display.TopRightReferencePoint, text = v.comment};
+                    self.comment.alpha = 0;
+                    self:insert(self.comment);
+
+                    transition.to(self.comment, {delay = 300, alpha = 1});
+
+                    v:setDefault(true);
+                else
+                    v:setDefault(false);
+                end
+            end
+        end
+
+        tl.names = {};
+
+        name = "type";
+        tl.label = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
+        tl:insert(tl.label);
+
+        name = "type_comment";
+        tl.comment = ui.myText{name = name, refPoint = display.TopLeftReferencePoint, old = true};
+        tl:insert(tl.comment);
+
+        name = "type_random";
+        tl.type_random = singleImage{name = name, width = typeW, height = typeH};
+        tl:insert(tl.type_random);
+        tl.names[name] = tl.type_random;
+
+        name = "type_interest";
+        tl.type_interest = singleImage{name = name, width = typeW, height = typeH};
+        tl:insert(tl.type_interest);
+        tl.names[name] = tl.type_interest;
+
+        name = "type_own";
+        tl.type_own = singleImage{name = name, width = typeW, height = typeH};
+        tl:insert(tl.type_own);
+        tl.names[name] = tl.type_own;
+
+        -- get type from preferences
+        tl:selectType(preference.getValue("type") or "type_random");
+        -- tl.parent.detailsline:selectType(preference.getValue("type") or "type_random");
+
+        return tl;
+    end
+
+    -- additional params selection
+    local function detailsline(params)
+        local v, name;
+
+        local dl = display.newGroup();
+
+        function dl:selectCount(name)
+            for k, v in pairs(self.counts) do
+                if (k == name) then
+                    preference.save{count = name};
+
+                    v:setDefault(true);
+                else
+                    v:setDefault(false);
+                end
+            end
+        end
+
+        function dl:selectType()
+            for k, v in pairs(self.types) do
+                v.isVisible = k == self.parent.type;
+            end
+        end
+
+        dl.types = {};
+        dl.counts = {};
+
+        -- random game
+        local type_random = display.newGroup();
+        type_random.counts = {};
+
+        name = "count";
+        type_random.label = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
+        type_random:insert(type_random.label);
+
+        name = "count_3";
+        type_random.count_3 = singleImage{name = name, width = typeW, height = typeH};
+        type_random:insert(type_random.count_3);
+        type_random.counts[name] = type_random.count_3;
+        dl.counts[name] = type_random.count_3;
+
+        name = "count_4";
+        type_random.count_4 = singleImage{name = name, width = typeW, height = typeH};
+        type_random:insert(type_random.count_4);
+        type_random.counts[name] = type_random.count_4;
+        dl.counts[name] = type_random.count_4;
+
+        name = "count_5";
+        type_random.count_5 = singleImage{name = name, width = typeW, height = typeH};
+        type_random:insert(type_random.count_5);
+        type_random.counts[name] = type_random.count_5;
+        dl.counts[name] = type_random.count_5;
+
+        name = "count_r";
+        type_random.count_r = singleImage{name = name, width = typeW, height = typeH};
+        type_random:insert(type_random.count_r);
+        type_random.counts[name] = type_random.count_r;
+        dl.counts[name] = type_random.count_r;
+
+        dl.type_random = type_random;
+        dl:insert(dl.type_random);
+        dl.types["type_random"] = dl.type_random;
+
+        -- interest game
+        local type_interest = display.newGroup();
+
+        name = "selectpair";
+        type_interest.label = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
+        type_interest:insert(type_interest.label);
+
+        type_interest.select = ui.myButton{
+            id = "selectpair",
+            onRelease = onBtnSelectRelease,
+            width = buttonW,
+            height = buttonH,
+            scale = scale
+        }
+        type_interest:insert(type_interest.select);
+
+        name = "selectpair_ws";
+        type_interest.wordstart = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
+        type_interest.wordstart.text = preference.getValue("start_interest") or "";
+        type_interest:insert(type_interest.wordstart);
+
+        name = "selectpair_wf";
+        type_interest.wordfinish = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
+        type_interest.wordfinish.text = preference.getValue("finish_interest") or "";
+        type_interest:insert(type_interest.wordfinish);
+
+        dl.type_interest = type_interest;
+        dl:insert(dl.type_interest);
+        dl.types["type_interest"] = dl.type_interest;
+
+        -- own game
+        local type_own = display.newGroup();
+
+        name = "selectpair_own";
+        type_own.selectpair_own = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
+        type_own:insert(type_own.selectpair_own);
+
+        name = "selectpair_own_sl";
+        type_own.selectpair_own_sl = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
+        type_own:insert(type_own.selectpair_own_sl);
+
+        name = "selectpair_own_fl";
+        type_own.selectpair_own_sl = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
+        type_own:insert(type_own.selectpair_own_sl);
+
+        -- own game words and keyboard
+        local function wordmodule(params)
+            local wm = display.newGroup()
+
+            wm.line = 1;
+            wm.selected = 0;
+            wm.ws = preference.getValue("start_own") or "     ";
+            wm.wf = preference.getValue("finish_own") or "     ";
+
+            local top = 505;
+            local left = 246;
+
+            -- define sizes of image
+            local image = display.newImage("images/sq_bg_null_full.png");
+            local width = image.width * scale;
+            local height = image.height * scale;
+            image:removeSelf();
+            image = nil;
+
+            local function wordLine(params)
+                -- create word line object
+                local wl = display.newGroup();
+
+                -- letter in word line
+                local function letter(params)
+                    -- create letter object
+                    local letter = display.newGroup();
+
+                    -- event tap on letter
+                    local function onEvent(event)
+                        local target = event.target;
+
+                        -- change selected letter
+                        if ("ended" == event.phase) then
+                            target.parent.parent.line = target.line;
+                            target.parent.parent.selected = target.position;
+                            target.parent.parent:updateColors{show = true};
+                        end
+
+                        return true;
+                    end
+
+                    -- change label by keyboard event
+                    function letter:setLbl(label)
+                        if (self.line == self.parent.parent.line and self.position == self.parent.parent.selected) then
+                            self.label.text = string.upper(label);
+                        end
+
+                        return self.label.text;
+                    end
+
+                    -- define image and color of object
+                    local image = "images/sq_bg_grey.png";
+                    local color = values.color_blue;
+
+                    if (params.image) then
+                        image = params.image;
+                    end
+
+                    if (params.color) then
+                        color = params.color;
+                    end
+
+                    letter.line = params.line;
+                    letter.position = params.position;
+
+                    -- create image and label for letter object
+                    letter.back = display.newImage(image, width, height);
+                    letter.back.width = width;
+                    letter.back.height = height;
+                    letter.back:setReferencePoint(display.TopLeftReferencePoint);
+                    letter:insert(letter.back);
+
+                    letter.label = display.newText(string.upper(params.label or ""), 0, 0, "Vatuma Script slc", 18);
+                    letter.label:setReferencePoint(display.CenterReferencePoint);
+                    letter.label:setTextColor(color[1], color[2], color[3]);
+                    letter:insert(letter.label);
+
+                    letter.x = params.left;
+                    letter.y = params.top;
+                    letter.back.x = 0;
+                    letter.back.y = 0;
+                    letter.label.x = letter.back.x + letter.back.width * 0.5;
+                    letter.label.y = letter.back.y + letter.back.height * 0.5;
+
+                    letter:addEventListener("touch", onEvent);
+
+                   return letter;
+                end
+
+                wl.word = params.word;
+                wl.line = params.line;
+                wl.selected = params.selected;
+
+                -- create all letters of word
+                for i = 1, #wl.word do
+                    local label = string.sub(wl.word, i, i);
+
+                    local pos = "pos" .. i;
+
+                    -- selected letter
+                    if (wl.selected == i) then
+                        wl[pos] = letter({
+                            left = (left + (i - 1) * cell) * scale + display.screenOriginX,
+                            top = (top + (wl.line - 1) * cell) * scale + display.screenOriginY,
+                            label = label,
+                            line = wl.line,
+                            position = i,
+                            image = "images/sq_bg_yellow.png",
+                        });
+                    -- unselected letter
+                    else
+                        wl[pos] = letter({
+                            left = (left + (i - 1) * cell) * scale + display.screenOriginX,
+                            top = (top + (wl.line - 1) * cell) * scale + display.screenOriginY,
+                            label = label,
+                            line = wl.line,
+                            position = i,
+                            image = "images/sq_bg_grey.png",
+                        });
+                    end
+
+                    wl:insert(wl[pos]);
+                end
+
+                -- change selected letter in selected word
+                function wl:setLbl(label)
+                    -- trying to change label letter by letter
+                    local newWord = "";
+                    for j = 1, #self.word do
+                        newWord = newWord .. self["pos" .. j]:setLbl(label);
+                    end
+
+                    return newWord;
+                end
+
+                return wl;
+            end
+
+            function wm:updateColors(params)
+                self:remove(self.start);
+                self:remove(self.finish);
+
+                if self.line == 1 then
+                    self.start = wordLine{word = self.ws, line = 1, selected = self.selected};
+                    self.finish = wordLine{word = self.wf, line = 2, selected = 0};
+                else
+                    self.start = wordLine{word = self.ws, line = 1, selected = 0};
+                    self.finish = wordLine{word = self.wf, line = 2, selected = self.selected};
+                end
+
+                self:insert(self.start);
+                self:insert(self.finish);
+
+                self:showKeyboard(params.show);
+            end
+
+            function wm:receiveLetter(letter)
+                if self.line == 1 then
+                    self.ws = self.start:setLbl(letter);
+                else
+                    self.wf = self.finish:setLbl(letter);
+                end
+
+                if self.selected == 5 then
+                    self.selected = 1;
+                else
+                    self.selected = self.selected + 1;
+                end
+
+                self:updateColors{show = true};
+            end
+
+            function wm:showKeyboard(show)
+                self.keyboard.isVisible = show;
+                self.selectpair_own_ready.isVisible = show;
+                btn_play.isVisible = not show;
+            end
+
+            -- touch on Ready button (label)
+            local function onEvent(event)
+                local target = event.target;
+
+                if ("ended" == event.phase) then
+                    target.parent:showKeyboard(false);
+                    target.parent.selected = 0;
+                    target.parent:updateColors{show = false};
+
+                    preference.save{start_own = string.gsub(target.parent.ws, " ", ""), finish_own = string.gsub(target.parent.wf, " ", "")};
+                end
+
+                return true;
+            end
+
+            name = "selectpair_own_ready";
+            wm.selectpair_own_ready = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
+            wm.selectpair_own_ready:addEventListener("touch", onEvent);
+            wm:insert(wm.selectpair_own_ready);
+
+            wm.start = wordLine{word = wm.ws, line = 1, selected = wm.selected};
+            wm.finish = wordLine{word = wm.wf, line = 2, selected = 0};
+
+            wm:insert(wm.start);
+            wm:insert(wm.finish);
+
+            wm.keyboard = Keyboard:new{wm = wm};
+            wm:insert(wm.keyboard);
+
+            wm:showKeyboard(false);
+
+            return wm;
+        end
+
+        type_own.wordmodule = wordmodule();
+        type_own:insert(type_own.wordmodule);
+
+        dl.type_own = type_own;
+        dl:insert(dl.type_own);
+        dl.types["type_own"] = dl.type_own;
+
+        dl:selectCount(preference.getValue("count") or "count_3");
+
+        return dl;
+    end
+
+    sm.type = "";
+
+    sm.typeline = typeline();
+    sm:insert(sm.typeline);
+
+    sm.detailsline = detailsline();
+    sm.detailsline:selectType();
+    sm:insert(sm.detailsline);
+
+    return sm;
 end
 
 function scene:createScene(event)
-    local image, scale, width, height;
+    print("scSinglePlay", "createScene");
+
+    display.setStatusBar(display.HiddenStatusBar);
+
     local screen = display.newGroup();
+
+    dbInit();
 
     screen:insert(ui.getBackground());
 
-    -- define scale big buttons
-    image = display.newImage("images/btn_border_1.png");
+    local scale = values.scale;
+    local width, height = values.getImageSizes("images/btn_border_1.png");
 
-    scale = display.contentHeight / dimens.main_dimens.height;
-    width = image.width * scale;
-    height = image.height * scale;
-
-    image:removeSelf();
-    image = nil;
-
-    screen:insert(ui.newButton{
+    screen.play = ui.newButton{
         id = "btn_play",
         onRelease = onBtnPlayRelease,
         width = width,
         height = height,
         scale = scale
-    });
+    };
+    screen:insert(screen.play);
+    btn_play = screen.play;
 
-    -- define scale small buttons
-    image = display.newImage("images/o_1.png");
+    screen.back = ui.myBackButton{scene = storyboard.getCurrentSceneName()};
+    screen.back:addEventListener("touch", onBackBtn);
+    screen:insert(screen.back);
 
-    scale = display.contentHeight / dimens.main_dimens.height;
-    width = image.width * scale;
-    height = image.height * scale;
+    -- create select module
+    screen.sm = selectModule();
+    screen:insert(screen.sm);
 
-    image:removeSelf();
-    image = nil;
+    -- print(storyboard.getCurrentSceneName());
+end
 
-    screen:insert(ui.newButton{
-        id = "btn_random",
-        onRelease = onBtnRandomRelease,
-        width = width,
-        height = height,
-        scale = scale
-    });
+function scene:enterScene(event)
+    print("scSinglePlay", "enterScene");
 
-    screen.isFocus = true;
+    receiveButtonEvents = true;
+
+    storyboard.purgeScene(storyboard.getPrevious());
+
+    if not db_main or not db_main:isopen() then
+        dbInit();
+    end
+end
+
+function scene:exitScene(event)
+    print("scSinglePlay", "exitScene");
+
+    receiveButtonEvents = false;
+
+    if db_main and db_main:isopen() then
+        db_main:close();
+    end
+end
+
+local function onSystemEvent(event)
+    print("scSinglePlay", "onSystemEvent", event.type);
+
+    if(event.type == "applicationExit") then
+        if db_main and db_main:isopen() then
+            db_main:close();
+        end
+    end
 end
 
 scene:addEventListener("createScene", scene);
+scene:addEventListener("enterScene", scene);
+scene:addEventListener("exitScene", scene);
+
+Runtime:addEventListener("system", onSystemEvent);
 
 return scene;

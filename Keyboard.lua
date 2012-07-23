@@ -6,14 +6,13 @@
 -- To change this template use File | Settings | File Templates.
 --
 
-local dimens = require("dimens");
 local widget = require("widget");
-local strings = require("strings");
+local values = require("values");
 
 Keyboard = {};
 
 function Keyboard:new(params)
-    local scale = dimens.scale;
+    local scale = values.scale;
     local screenWidth = display.viewableContentWidth;
     local screenHeight = display.viewableContentHeight;
 
@@ -25,9 +24,9 @@ function Keyboard:new(params)
         local phase = event.phase;
         local target = event.target;
 
+        -- send letter to word module, for ex.
         if "release" == phase then
             wm:receiveLetter(target.label.text);
-            -- print(target.label.text);
         end
 
         return true;
@@ -42,10 +41,13 @@ function Keyboard:new(params)
     local paddingH = 3;
     local paddingV = 3;
 
+    local keylines = values.keylines;
+    local language = values.language;
+
     -- define max length of keyboard line
     local hlength = 0;
-    for k, v in ipairs(strings.keylines) do
-        local hchength = #strings.keylines[k][strings.language];
+    for k, v in ipairs(keylines) do
+        local hchength = #keylines[k][language];
         hlength = math.max(hlength, hchength);
     end
 
@@ -54,7 +56,7 @@ function Keyboard:new(params)
 
     local countH;
     local countV = 0;
-    for k, v in ipairs(strings.keylines) do
+    for k, v in ipairs(keylines) do
         local paddingC;
 
         countH = 0;
@@ -62,19 +64,21 @@ function Keyboard:new(params)
 
         local keyline = display.newGroup();
 
-        local hchength = #strings.keylines[k][strings.language];
+        local hchength = #keylines[k][language];
         if hchength < hlength then
             paddingC = 0.5 * (hlength - hchength) * (paddingH + width);
         else
             paddingC = 0;
         end
 
-        for k1, v1 in ipairs(strings.keylines[k][strings.language]) do
+        for k1, v1 in ipairs(keylines[k][language]) do
+            local top = screenHeight + display.screenOriginY - countV * (paddingV + height);
+
             keyline:insert(widget.newButton{
                 id = k .. countV .. countH,
                 label = string.upper(v1),
                 left = countH * (paddingH + width) + paddingH + display.screenOriginX + paddingC,
-                top = screenHeight - countV * (paddingV + height),
+                top = top,
                 width = width,
                 height = height,
                 font = "Vatuma Script slc",

@@ -11,6 +11,7 @@ module(..., package.seeall);
 -- languages
 en = "en";
 ru = "ru";
+font = "Vatuma Script slc";
 
 -- current language
 language = en;
@@ -27,18 +28,6 @@ db_name = {
 }
 
 buttons = {
-    btn_campaign = {
-        [en] = "Campaign",
-        [ru] = "Кампания",
-    },
-    btn_singleplay = {
-        [en] = "Single play",
-        [ru] = "Одиночная игра",
-    },
-    btn_singleplay2 = {
-        [en] = "Single play",
-        [ru] = "Одиночная игра",
-    },
     btn_play = {
         [en] = "Play",
         [ru] = "Играть",
@@ -46,6 +35,17 @@ buttons = {
     btn_random = {
         [en] = "",
         [ru] = "",
+    },
+}
+
+labels = {
+    txt_notindict = {
+        [en] = "no word in the dictionary",
+        [ru] = "нет такого слова в словаре",
+    },
+    txt_know = {
+        [en] = "I know it!",
+        [ru] = "Есть такое!",
     },
 }
 
