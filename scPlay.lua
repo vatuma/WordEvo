@@ -28,6 +28,27 @@ local path_main = system.pathForFile("main.sqlite", system.DocumentsDirectory);
 local db_words;
 local path_words = system.pathForFile(values.db_name[values.game_language], system.ResourceDirectory);
 
+local main = {}; -- table for game process
+
+local function loadMain()
+    local sql = "SELECT * FROM " .. gametable .. " ORDER BY type, line;";
+
+    for row in db_main:nrows(sql) do
+        local type = row.type;
+        local line = row.line;
+
+        local ttype = main[type] or {};
+        local tline = ttype[line] or {};
+
+        tline.word = row.word;
+
+        print(type, line, tline.word);
+    end
+end
+
+local function saveMain()
+end
+
 -- call back button
 local function onBackBtn(event)
     if receiveButtonEvents == false then
@@ -649,6 +670,7 @@ function scene:createScene(event)
 
     -- module for words editing
     dbInit();
+    loadMain();
 
     -- clearing word module for new game
     if (start ~= "" and finish ~= "") then
