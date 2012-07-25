@@ -28,10 +28,6 @@ db_name = {
 }
 
 buttons = {
-    btn_play = {
-        [en] = "Play",
-        [ru] = "Играть",
-    },
     btn_random = {
         [en] = "",
         [ru] = "",

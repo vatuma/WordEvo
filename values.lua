@@ -16,7 +16,7 @@ scale = 1;
 main_height = 1024;
 wordmodule_x = 51;
 wordmodule_y = 153;
-wordmodule_width = 561 + 51;
+wordmodule_width = 612;
 wordmodule_height = 459;
 
 -- localization
@@ -36,6 +36,9 @@ tblsingleplay = "wmsingleplay";
 -- genetic algorithm
 max_level = 10;
 max_population = 50;
+
+start_line = 1;
+finish_line = 11;
 
 alphabet = {
     [en] = {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "u", "v", "w", "t", "x", "y", "z"},
@@ -82,6 +85,16 @@ buttons = {
         over = "images/btn_border_4_pressed.png",
         [en] = "Rules",
         [ru] = "Правила",
+    },
+    play_single = {
+        x = 344,
+        y = 748,
+        fontSize = 40,
+        textColor = color_blue,
+        default = "images/btn_border_1.png",
+        over = "images/btn_border_1_pressed.png",
+        [en] = "Play",
+        [ru] = "Играть",
     },
     type_random = {
         x = 142,
@@ -297,6 +310,15 @@ labels = {
         textColor = color_red,
         [en] = "duplicate",
         [ru] = "дубль",
+        image = "images/ic_duplicate.png",
+    },
+    wm_goback = {
+        x = 408,
+        y = 306,
+        fontSize = 32,
+        textColor = color_red,
+        [en] = "go back",
+        [ru] = "вернуться",
         image = "images/ic_duplicate.png",
     },
     wm_clear = {

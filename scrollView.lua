@@ -23,45 +23,58 @@
  
 module(..., package.seeall)
 
+local values = require("values");
+
 -- set some global values for width and height of the screen
 local screenW, screenH = display.contentWidth, display.contentHeight
 local viewableScreenW, viewableScreenH = display.viewableContentWidth, display.viewableContentHeight
 local screenOffsetW, screenOffsetH = display.contentWidth -  display.viewableContentWidth, display.contentHeight - display.viewableContentHeight
 
 local prevTime = 0
+local offsetScroll = 0;
 
 function new(params)
 	-- setup a group to be the scrolling screen
 	local scrollView = display.newGroup()
-		
+
+    offsetScroll = params.offsetScroll or 0;
+
 	scrollView.top = params.top or 0
 	scrollView.bottom = params.bottom or 0
 
+    function scrollView:onbegan(event)
+        print(scrollView.y)
+
+        self.startPos = event.y
+        self.prevPos = event.y
+        self.delta, self.velocity = 0, 0
+        if self.tween then transition.cancel(self.tween) end
+
+        Runtime:removeEventListener("enterFrame", scrollView )
+
+        self.prevTime = 0
+        self.prevY = 0
+
+        transition.to(self.scrollBar,  { time=200, alpha=1 } )
+
+        -- Start tracking velocity
+        Runtime:addEventListener("enterFrame", trackVelocity)
+
+        -- Subsequent touch events will target button even if they are outside the contentBounds of button
+        display.getCurrentStage():setFocus( self )
+        self.isFocus = true
+    end
+
 	function scrollView:touch(event) 
 	        local phase = event.phase      
-	        print(phase)
+	        print(phase, self.isFocus);
+
+            local function onBegan(event)
+            end
 	        			        
 	        if( phase == "began" ) then
-				print(scrollView.y)
-	                self.startPos = event.y
-	                self.prevPos = event.y                                       
-	                self.delta, self.velocity = 0, 0
-		            if self.tween then transition.cancel(self.tween) end
+                self:onbegan(event);
 
-	                Runtime:removeEventListener("enterFrame", scrollView ) 
-
-					self.prevTime = 0
-					self.prevY = 0
-
-					transition.to(self.scrollBar,  { time=200, alpha=1 } )									
-
-					-- Start tracking velocity
-					Runtime:addEventListener("enterFrame", trackVelocity)
-	                
-	                -- Subsequent touch events will target button even if they are outside the contentBounds of button
-	                display.getCurrentStage():setFocus( self )
-	                self.isFocus = true
-	 
 	        elseif( self.isFocus ) then
 	 
 	                if( phase == "moved" ) then     
@@ -101,9 +114,30 @@ function new(params)
         --turn off scrolling if velocity is near zero
         if math.abs(self.velocity) < .01 then
                 self.velocity = 0
-	            Runtime:removeEventListener("enterFrame", scrollView )          
-				transition.to(self.scrollBar,  { time=400, alpha=0 } )									
-        end       
+
+                -- track to discrete position
+                local cell = values.cell * values.scale;
+
+                local function newY()
+                    local rest = self.y % cell;
+
+                    if math.abs(rest) > cell * 0.5 then
+                        return self.y + (cell - rest);
+                    else
+                        return self.y - rest;
+                    end
+                end
+
+                -- print(cell, self.y, self.y % cell, self.y - self.y % cell, newY());
+
+                transition.to(self, {time = 250, y = newY()});
+
+                scrollView:moveScrollBar()
+                -- end track to discrete position
+
+                Runtime:removeEventListener("enterFrame", scrollView )
+				transition.to(self.scrollBar,  { time=400, alpha=0 } )
+        end
 
         self.velocity = self.velocity*friction
         
@@ -175,8 +209,9 @@ function new(params)
 						
 		local viewPortH = screenH - self.top - self.bottom 
 		local scrollH = viewPortH*self.height/(self.height*2 - viewPortH)		
-		local scrollBar = display.newRoundedRect(viewableScreenW-8,0,5,scrollH,2)
-		scrollBar:setFillColor(scrollColorR, scrollColorG, scrollColorB, scrollColorA)
+		-- local scrollBar = display.newRoundedRect(viewableScreenW-8,0,5,scrollH,2)
+        local scrollBar = display.newRoundedRect(offsetScroll + display.screenOriginX,0,5,scrollH,2)
+        scrollBar:setFillColor(scrollColorR, scrollColorG, scrollColorB, scrollColorA)
 
 		local yRatio = scrollH/self.height
 		self.yRatio = yRatio		

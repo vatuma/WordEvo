@@ -649,15 +649,14 @@ function scene:createScene(event)
 
     screen:insert(ui.getBackground());
 
-    local scale = values.scale;
     local width, height = values.getImageSizes("images/btn_border_1.png");
 
-    screen.play = ui.newButton{
-        id = "btn_play",
+    screen.play = ui.myButton{
+        id = "play_single",
         onRelease = onBtnPlayRelease,
         width = width,
         height = height,
-        scale = scale
+        scale = values.scale
     };
     screen:insert(screen.play);
     btn_play = screen.play;

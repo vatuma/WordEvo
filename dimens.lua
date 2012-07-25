@@ -24,14 +24,6 @@ word_block = {
     finish = 11,
 }
 
-btn_play = {
-    x = 344,
-    y = 748,
-    fontSize = 40,
-    default = "images/btn_border_1.png",
-    over = "images/btn_border_1_pressed.png"
-}
-
 btn_random = {
     x = 296,
     y = 452,

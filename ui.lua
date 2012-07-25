@@ -8,12 +8,10 @@
 
 module(..., package.seeall);
 
-local dimens = require("dimens");
-local strings = require("strings")
 local widget = require("widget");
 local values = require("values");
-local storyboard = require("storyboard");
 
+--[[
 function newButton(params)
     local id = params.id;
     local width = params.width;
@@ -38,6 +36,7 @@ function newButton(params)
 
     return btn;
 end
+]]--
 
 function myText(params)
     local name = params.name;
@@ -189,8 +188,8 @@ function toast(params)
 
     local obj = display.newGroup();
 
-    obj.back = display.newRoundedRect(0, 0, 150, 50, 15);
-    obj.back.strokeWidth = 3;
+    obj.back = display.newRoundedRect(0, 0, 150, 50, 10);
+    obj.back.strokeWidth = 2;
     obj.back:setFillColor(0, 125, 0);
     obj.back:setStrokeColor(0, 0, 125);
     obj.back:setReferencePoint(display.CenterReferencePoint);
@@ -216,6 +215,7 @@ function toast(params)
     return obj;
 end
 
+--[[
 function runner(params)
     local pstart;
     local pfinish;
@@ -278,3 +278,4 @@ function runner(params)
 
     return r;
 end
+]]--

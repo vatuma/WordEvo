@@ -16,6 +16,7 @@ local values = require("values");
 local widget = require("widget");
 local sqlite = require("sqlite3");
 local scrollView = require("scrollView")
+local preference = require("save_and_load_library_from_satheesh");
 
 local receiveButtonEvents = false;
 
@@ -28,7 +29,7 @@ local path_main = system.pathForFile("main.sqlite", system.DocumentsDirectory);
 local db_words;
 local path_words = system.pathForFile(values.db_name[values.game_language], system.ResourceDirectory);
 
-local main = {}; -- table for game process
+local tmain = {}; -- table for game process
 
 local function loadMain()
     local sql = "SELECT * FROM " .. gametable .. " ORDER BY type, line;";
@@ -37,16 +38,37 @@ local function loadMain()
         local type = row.type;
         local line = row.line;
 
-        local ttype = main[type] or {};
+        local ttype = tmain[type] or {};
         local tline = ttype[line] or {};
 
         tline.word = row.word;
+        tline.linelb = row.linelb;
+        tline.modified = row.modified;
+        tline.selected = row.selected;
+        tline.off = row.off;
+
+        tmain[type] = ttype;
+        tmain[type][line] = tline;
 
         print(type, line, tline.word);
     end
 end
 
 local function saveMain()
+    local sql = "DELETE FROM " .. gametable .. ";";
+
+    for k,v in pairs(tmain) do
+        for k1,v1 in pairs(v) do
+            -- print("INSERT", k, k1, v1.word, v1.selected, v1.modified, v1.off);
+
+            local linelb = v1.linelb or "";
+            sql = sql .. "INSERT into " .. gametable .. " ('type', 'line', 'linelb', 'word', 'selected', 'modified', 'off') VALUES ('" .. k .. "'," .. k1 .. ",'" .. linelb .. "','" .. v1.word:lower() .. "'," .. v1.selected .. "," .. v1.modified .. "," .. v1.off .. ");";
+        end
+    end
+
+    -- print(sql);
+
+    db_main:exec(sql);
 end
 
 -- call back button
@@ -60,37 +82,6 @@ local function onBackBtn(event)
     end
 
     return true;
-end
-
--- check new word by dictionary
-local function checkWord(word, wordmodule)
-    local result = false;
-
-    wordmodule.notindict.isVisible = true;
-    wordmodule.iknow.isVisible = true;
-
-    wordmodule.dup = -1;
-    wordmodule.duplicate.isVisible = false;
-
-    wordmodule.cle = -1;
-    wordmodule.clear.isVisible = false;
-
-    local sql = "SELECT * FROM dict WHERE word='" .. string.lower(word) .. "';";
-    for row in db_words:nrows(sql) do
-        wordmodule.notindict.isVisible = false;
-        wordmodule.iknow.isVisible = false;
-
-        result = true;
-        break;
-    end
-
-    local sqld = "SELECT * FROM " .. gametable .. " WHERE word='" .. string.lower(word) .. "' AND type='line';";
-    for row in db_main:nrows(sqld) do
-        wordmodule.dup = row.line;
-        wordmodule:showDuplicate{};
-    end
-
-    return result;
 end
 
 -- entirely module of words
@@ -107,27 +98,97 @@ local function wordModule(params)
     wm.finish = params.finish or ""; -- finish word
 
     wm.line = 2; -- edited line
-    wm.dup = -1; -- line to go duplicate
-    wm.max = 2; -- count of filled lines
     wm.selected = 2; -- edited position of letter (first is row number)
+
+    wm.clear_max = 2; -- count of filled lines
+    wm.clear_pos = -1;
+    wm.duplicate_pos = -1; -- line to go duplicate
 
     wm.lines = {}; -- all lines for quick link
 
-    function wm:gotoDuplicate()
+    -- check new word by dictionary and show signal labels
+    function wm:checkWord(word)
+        local result = false;
 
+        -- show label about incorrect word
+        self.notindict.isVisible = true;
+        self.iknow.isVisible = true;
+
+        local sql = "SELECT * FROM dict WHERE word='" .. string.lower(word) .. "';";
+        for row in db_words:nrows(sql) do
+            -- hide label about incorrect word
+            self.notindict.isVisible = false;
+            self.iknow.isVisible = false;
+
+            result = true;
+            break;
+        end
+
+        return result;
+    end
+
+    function wm:gotoDuplicate()
+        tmain["line"][wm.duplicate_pos].modified = 1;
+        wm:updateColors();
+
+        self.goback.isVisible = true;
+        self.goback.y = self.scroll.area["line" .. wm.duplicate_pos][1].y;
+    end
+
+    function wm:gotoBack()
     end
 
     function wm:showDuplicate(params)
-        self.duplicate.isVisible = true;
-        self.duplicate.y = self.scroll.area["line" .. self.line][1].y;
+        -- hide duplicate indicator
+        self.duplicate_pos = -1;
+        self.duplicate.isVisible = false;
+
+        local word = tmain["line"][self.line].word;
+
+        for k,v in pairs(tmain["line"]) do
+            if k < self.line - 1 and word == v.word then
+                self.duplicate_pos = k;
+                break;
+            end
+        end
+
+        if self.duplicate_pos > 0 then
+            self.duplicate.isVisible = true;
+            self.duplicate.y = self.scroll.area["line" .. self.line][1].y;
+        end
+    end
+
+    -- modified all lines for clean
+    function wm:setOff()
+        if self.line < self.clear_max then
+            for k,v in pairs(tmain["line"]) do
+                if v.off == 1 then
+                    v.off = 0;
+                    v.modified = 1;
+                end
+
+                if k > self.line then
+                    v.off = 1;
+                    v.modified = 1;
+                end
+            end
+        else
+            for k,v in pairs(tmain["line"]) do
+                if v.off == 1 then
+                    v.off = 0;
+                    v.modified = 1;
+                end
+            end
+        end
+
+        self:updateColors();
+        self:showClear{};
     end
 
     function wm:showClear(params)
         self.clear.isVisible = false;
 
-        print(self.line, self.max)
-
-        if self.line < self.max then
+        if self.line < self.clear_max then
             self.clear.isVisible = true;
             self.clear.y = self.scroll.area["line" .. self.line][1].y;
         end
@@ -145,6 +206,18 @@ local function wordModule(params)
         return true;
     end
 
+    local function onGoback(event)
+        if receiveButtonEvents == false then
+            return false;
+        end;
+
+        if event.phase == "ended" then
+            event.target.wm:gotoBack();
+        end
+
+        return true;
+    end
+
     local function onClear(event)
         if receiveButtonEvents == false then
             return false;
@@ -155,25 +228,6 @@ local function wordModule(params)
         end
 
         return true;
-    end
-
-    function wm:setOff()
-        local sql;
-
-        print(self.line, self.max)
-
-        if (self.line < self.max) then
-            sql = "UPDATE " .. gametable .. " SET off=0, modified=1 WHERE off=1 AND type='line';";
-            db_main:exec(sql);
-
-            sql = "UPDATE " .. gametable .. " SET off=1, modified=1 WHERE line>" .. self.line .. " AND type='line';";
-        else
-            sql = "UPDATE " .. gametable .. " SET off=0, modified=1 WHERE off=1;";
-        end
-
-        db_main:exec(sql);
-        self:updateColors();
-        self:showClear{};
     end
 
     -- single word line
@@ -190,15 +244,34 @@ local function wordModule(params)
             local function onEvent(event)
                 local target = event.target;
 
-                -- print("TOUCH LETTER", target.label.text, target.line, target.position);
-
                 -- change selected letter
                 if ("ended" == event.phase) then
+                    local ypos = target.ypos or event.y;
+                    if math.abs(ypos - event.y) > 2 then
+                        return false;
+                    end
+
                     -- don't touch numbers
                     if (target.position ~= 1) then
                         target.wordmodule:selectLine{line = target.line, selected = target.position, update = true};
                         target.wordmodule:setOff();
+
+                        -- hide info about duplicate
+                        target.wordmodule.duplicate_pos = -1;
+                        target.wordmodule.duplicate.isVisible = false;
                     end
+
+                elseif event.phase == "began" then
+                    target.ypos = event.y;
+
+                elseif event.phase == "moved" then
+                    -- transition move event to scroll area
+                    local ypos = target.ypos or event.y;
+                    if math.abs(ypos - event.y) > 2 then
+                        target.wordmodule.scroll.area:onbegan(event);
+                    end
+
+                    return true;
                 end
 
                 return true;
@@ -244,14 +317,29 @@ local function wordModule(params)
             letter.label:setTextColor(color[1], color[2], color[3]);
             letter:insert(letter.label);
 
-            -- print("LABEL", letter.label.text);
-
             letter.x = params.left;
             letter.y = params.top;
             letter.back.x = 0;
             letter.back.y = 0;
             letter.label.x = letter.back.x + letter.back.width * 0.5;
             letter.label.y = letter.back.y + letter.back.height * 0.5;
+
+            if color == values.color_red then
+                letter.label.alpha = 0;
+                letter.label:setTextColor(values.color_blue[1], values.color_blue[2], values.color_blue[3]);
+
+                letter.labeld = display.newText(string.upper(params.label or ""), 0, 0, values.font, 18 * 2);
+                letter.labeld.xScale = 0.5; letter.labeld.yScale = 0.5;
+                letter.labeld:setReferencePoint(display.CenterReferencePoint);
+                letter.labeld:setTextColor(color[1], color[2], color[3]);
+                letter:insert(letter.labeld);
+
+                letter.labeld.x = letter.back.x + letter.back.width * 0.5;
+                letter.labeld.y = letter.back.y + letter.back.height * 0.5;
+
+                transition.to(letter.label, {time = 2000, alpha = 1});
+                transition.to(letter.labeld, {time = 2000, alpha = 0});
+            end
 
             if image_nil then
                 letter:remove(letter.back);
@@ -264,20 +352,27 @@ local function wordModule(params)
 
         wl.word = params.word;
         wl.line = params.line;
+        wl.linelb = params.linelb or "";
         wl.off = params.off or 0;
         wl.type = params.type or "";
         wl.selected = params.selected;
         wl.wordmodule = params.wordmodule;
 
         if (wl.word ~= "" and wl.type == "line") then
-            wl.wordmodule.max = math.max(wl.wordmodule.max, wl.line);
+            wl.wordmodule.clear_max = math.max(wl.wordmodule.clear_max, wl.line);
         end
+
+        print(wl.type, wl.line, wl.word)
 
         -- create all letters of word
         for i = 1, #wl.word + 1 do
             local label;
             if i == 1 then
-                label = wl.line;
+                if wl.linelb == "" then
+                    label = wl.line;
+                else
+                    label = wl.linelb;
+                end
             else
                 label = string.sub(wl.word, i - 1, i - 1);
             end
@@ -292,37 +387,41 @@ local function wordModule(params)
                 top = (values.wordmodule_y + (wl.line - 1) * cell) * values.scale + display.screenOriginY;
             end
 
+            local function newLetter(params)
+                local result;
+                local color = params.color or values.color_blue;
+                local image = params.image or "images/sq_bg_null_full.png";
+
+                result = letter({
+                    left = left,
+                    top = top,
+                    label = label,
+                    line = wl.line,
+                    position = i,
+                    image = image,
+                    color = color,
+                    wordmodule = wl.wordmodule,
+                });
+
+                return result;
+            end
+
             -- selected letter
             if (wl.selected == i) then
-                wl[pos] = letter({
-                    left = left,
-                    top = top,
-                    label = label,
-                    line = wl.line,
-                    position = i,
-                    image = "images/sq_bg_yellow.png",
-                    wordmodule = wl.wordmodule,
-                });
+                wl[pos] = newLetter{image = "images/sq_bg_yellow.png"};
+
+            -- off letter
             elseif (wl.off == 1) then
-                wl[pos] = letter({
-                    left = left,
-                    top = top,
-                    label = label,
-                    line = wl.line,
-                    position = i,
-                    wordmodule = wl.wordmodule,
-                    color = values.color_grey,
-                });
-                -- unselected letter
+                wl[pos] = newLetter{color = values.color_grey};
+
+            -- unselected letter
             else
-                wl[pos] = letter({
-                    left = left,
-                    top = top,
-                    label = label,
-                    line = wl.line,
-                    position = i,
-                    wordmodule = wl.wordmodule,
-                });
+                if wl.wordmodule.duplicate_pos == wl.line
+                    and wl.type == "line" then
+                    wl[pos] = newLetter{color = values.color_red};
+                else
+                    wl[pos] = newLetter{};
+                end
             end
 
             wl:insert(wl[pos]);
@@ -340,12 +439,10 @@ local function wordModule(params)
 
             -- change word in database
             if (self.word:lower() ~= newWord:lower()) then
-                if (checkWord(newWord, self.wordmodule)) then
-                    print("want to add row", string.lower(wl.word), string.lower(newWord));
+                if (self.wordmodule:checkWord(newWord)) then
 
                     self.wordmodule:updateWord{word = newWord};
-                else
-                    print("HAVEN't WORD " .. newWord);
+                    self.wordmodule:showDuplicate{};
                 end
             end
         end
@@ -355,19 +452,40 @@ local function wordModule(params)
 
     -- change word in database
     function wm:updateWord(params)
-        local word = params.word;
+        local word = params.word:lower();
 
         local line = self.line;
         local newLine = line + 1;
 
-        local sql = "UPDATE " .. gametable .. " SET word='" .. word:lower() .. "', modified=1 WHERE  line=" .. line .. " AND type='line';";
-        local sqlnew = "UPDATE " .. gametable .. " SET word='" .. word:lower() .. "', modified=1 WHERE line=" .. newLine .. " AND type='line';";
+        tmain["line"][line].word = word;
+        tmain["line"][line].modified = 1;
 
-        -- there check total line count, add new line before update if necessary
+        local count = 0;
+        for k,v in pairs(tmain["line"]) do
+            count = count + 1;
+        end
 
-        -- update word lines in database
-        db_main:exec(sql);
-        db_main:exec(sqlnew);
+        print("update", count, newLine);
+
+        if count < newLine + 2 then
+            local nl = count + 2;
+
+            tmain["line"][nl] = {};
+            tmain["line"][nl].off = 0;
+            tmain["line"][nl].word = "";
+            tmain["line"][nl].modified = 1;
+            tmain["line"][nl].selected = 0;
+
+            tmain["finish"][values.finish_line].linelb = nl + 1;
+            tmain["finish"][values.finish_line].modified = 1;
+        end
+
+        for k,v in pairs(tmain["line"]) do
+            print("updateline", k, v.word);
+        end
+
+        tmain["line"][newLine].word = word;
+        tmain["line"][newLine].modified = 1;
 
         -- positioning on added line
         self:selectLine{line = newLine, selected = 2, update = true};
@@ -378,16 +496,17 @@ local function wordModule(params)
         self.line = params.line;
         self.selected = params.selected;
 
-        -- modified lines with selected letter in database
-        local sql = "SELECT * FROM " .. gametable .. " WHERE NOT selected=0;";
-        for row in db_main:nrows(sql) do
-            local sql = "UPDATE " .. gametable .. " SET selected=0, modified=1 WHERE line=" .. row.line .. " AND type='line';";
-            db_main:exec(sql);
-        end
+        for k,v in pairs(tmain["line"]) do
+            if v.selected ~= 0 then
+                v.selected = 0;
+                v.modified = 1;
+            end
 
-        -- modified added line
-        local sqlnew = "UPDATE " .. gametable .. " SET selected=" .. self.selected .. ", modified=1 WHERE line=" .. self.line .. " AND type='line';";
-        db_main:exec(sqlnew);
+            if k == self.line then
+                v.selected = self.selected;
+                v.modified = 1;
+            end
+        end
 
         -- refresh lines in word module, if update is needed
         if (params.update and params.update == true) then
@@ -397,30 +516,31 @@ local function wordModule(params)
 
     -- get word line from database
     function wm:readLine(params)
-        local word = params.word or "";
-        local line = params.line or 0;
+        local linelb;
         local type = params.type;
-        local selected = 0;
-        local off = 0;
+        local line = params.line or 0;
+        local word = params.word or "";
+        local selected, off = 0, 0;
 
         local sql;
         local count = 0;
 
-        -- trying to get word from database
-        if (line == 0) then
-            sql = "SELECT * FROM " .. gametable .. " WHERE type='" .. type .. "';";
+        -- searching word in table by line and type
+        local isnew = false;
+        local ttype = tmain[type] or nil;
+        if ttype == nil then
+            isnew = true;
         else
-            sql = "SELECT * FROM " .. gametable .. " WHERE type='" .. type .. "' AND line=" .. line .. ";";
-        end
+            local tline = ttype[line];
 
-        -- get data from database
-        for row in db_main:nrows(sql) do
-            word = row.word or "";
-            line = row.line;
-            selected = row.selected;
-            off = row.off;
-
-            count = count + 1;
+            if tline == nil then
+                isnew = true;
+            else
+                word = tline.word;
+                linelb = tline.linelb or "";
+                selected = tline.selected;
+                off = tline.off;
+            end
         end
 
         -- first filling
@@ -431,13 +551,21 @@ local function wordModule(params)
 
         -- set selected number for word module
         if (selected ~= 0) then
+            self.line = line;
             self.selected = selected;
         end
 
         -- inserting data into database
-        if (count == 0) then
-            local sql = "INSERT into " .. gametable .. " ('line', 'type', 'word', 'selected') VALUES (" .. line .. ", '" .. type .. "', '" .. word:lower() .. "', " .. selected .. ");"
-            db_main:exec(sql);
+        if isnew then
+            if tmain[type] == nil then
+                tmain[type] = {};
+            end
+
+            tmain[type][line] = {};
+            tmain[type][line].word = word;
+            tmain[type][line].selected = selected;
+            tmain[type][line].modified = 0;
+            tmain[type][line].off = 0;
         end
 
         -- add new object into parent object
@@ -445,52 +573,25 @@ local function wordModule(params)
 
         -- rewrite ref to word line in word module
         if (type == "line") then
-            -- print("LB", self.scroll.numChildren, self.numChildren, self.scroll[name]);
-
-            -- delete old word line
-            -- --[[
             if self.scroll.area[name] then
                 self.scroll.area[name]:removeSelf();
             end
 
             self.scroll.area:remove(self.scroll.area[name]);
-            -- ]]--
-
-            --[[
-            if self.scroll[name] then
-                self.scroll[name]:removeSelf();
-            end
-
-            self.scroll:remove(self.scroll[name]);
-            ]]--
 
             -- create and add new word line
-            -- --[[
             self.scroll.area[name] = nil;
             self.scroll.area[name] = wordLine({word = word, line = line, selected = selected, wordmodule = self, off = off, type = "line"});
             self.scroll.area:insert(self.scroll.area[name]);
 
             self.lines["line" .. line] = self.scroll.area[name];
-            -- ]]--
-
-            --[[
-            self.scroll[name] = nil;
-            self.scroll[name] = wordLine({word = word, line = line, selected = selected, wordmodule = self, off = off, type = "line"});
-            self.scroll:insert(self.scroll[name]);
-
-            self.lines["line" .. line] = self.scroll[name];
-            ]]--
-
-            -- print("LA", self.scroll.numChildren, self.numChildren, self.scroll[name]);
         else
-            -- print("NL", self.numChildren);
-
             -- delete old word line
             self:remove(self[name]);
 
             -- create and add new word line
             self[name] = nil;
-            self[name] = wordLine({word = word, line = line, selected = selected, wordmodule = self});
+            self[name] = wordLine({word = word, line = line, selected = selected, wordmodule = self, type = type, linelb = linelb});
             self:insert(self[name]);
         end
 
@@ -499,14 +600,14 @@ local function wordModule(params)
 
     -- update modified lines
     function wm:updateColors(params)
-        local sql = "SELECT * FROM " .. gametable .. " WHERE modified = 1;";
-        for row in db_main:nrows(sql) do
-            self:readLine{line = row.line, type = "line"};
+        for kt,vt in pairs(tmain) do
+            for k,v in pairs(vt) do
+                if v.modified == 1 then
+                    print(kt, k, v.word);
 
-            -- unmodified readed line
-            if (row.modified == 1) then
-                local sql = "UPDATE " .. gametable .. " SET modified = 0 WHERE line=" .. row.line .. " AND type='line';";
-                db_main:exec(sql);
+                    self:readLine{line = k, type = kt};
+                    v.modified = 0;
+                end
             end
         end
     end
@@ -519,94 +620,45 @@ local function wordModule(params)
     end
 
     -- get start and finish lines
-    wm.start = wm:readLine{type = "start", word = wm.start, line = 1};
-    wm.finish = wm:readLine{type = "finish", word = wm.finish, line = 11};
+    wm.start = wm:readLine{type = "start", word = wm.start, line = values.start_line};
+    wm.finish = wm:readLine{type = "finish", word = wm.finish, line = values.finish_line};
 
     -- add scrollable area
+    wm.scroll = display.newGroup();
+    wm:insert(wm.scroll);
+
+    wm.scroll.area = scrollView.new{top = (values.wordmodule_y + values.cell) * values.scale + display.screenOriginY,
+        bottom = display.contentHeight - (values.wordmodule_y + values.cell * 10) * values.scale - display.screenOriginY,
+        offsetScroll = values.cell * (#wm.start + 3) * values.scale};
+    wm.scroll:insert(wm.scroll.area);
+
+    -- masking scroll area
     local mask = graphics.newMask("images/tmp.jpg", system.ResourceDirectory);
 
-    wm.scroll = display.newGroup();
-    wm:insert(wm.scroll);
-
-    wm.scroll.area = scrollView.new{top = (values.wordmodule_y + values.cell) * values.scale + display.screenOriginY, bottom = display.contentHeight - (values.wordmodule_y + values.cell * 10) * values.scale - display.screenOriginY};
-    wm.scroll:insert(wm.scroll.area);
-
-    -- wm.scroll.x = values.wordmodule_x * values.scale + display.screenOriginX;
-    -- wm.scroll.y = (values.wordmodule_y + values.cell) * values.scale + display.screenOriginY
-
-    -- print(wm.scroll.top, wm.scroll.bottom, wm.scroll.x, wm.scroll.y, wm.scroll.width)
-
-    print(wm.scroll.x, wm.scroll.y, wm.scroll.area.top, wm.scroll.area.bottom)
-
     wm.scroll:setMask(nil);
     wm.scroll:setMask(mask);
 
     wm.scroll.maskX = values.cell * 9 * values.scale / 2 + values.wordmodule_x * values.scale + display.screenOriginX;
     wm.scroll.maskY = values.cell * 9 * values.scale / 2 + (values.wordmodule_y + values.cell) * values.scale + display.screenOriginY;
 
-    --[[
-    wm.scroll = widget.newScrollView{
-        left = values.wordmodule_x * values.scale + display.screenOriginX,
-        top = (values.wordmodule_y + values.cell) * values.scale + display.screenOriginY,
-        width = values.cell * 9 * values.scale,
-        height = values.cell * 9 * values.scale,
-        bgColor = {0, 255, 0, 100},
-        -- listener = "",
-    };
-    wm:insert(wm.scroll);
-
-    wm.scroll:setMask(nil);
-    wm.scroll:setMask(mask);
-
-    wm.scroll.maskX = wm.scroll.width/2
-    wm.scroll.maskY = wm.scroll.height/2 - 0 * values.scale
-    ]]--
-
-    --[[
-    local function onArea(event)
-        local target = event.target;
-
-        print("onArea");
-
-        if event.phase == "moved" then
-            target.y = event.y;
-        end
-    end
-
-    wm.scroll = display.newGroup();
-    wm.scroll:addEventListener("touch", onArea);
-    wm:insert(wm.scroll);
-
-    wm.scroll.area = display.newGroup();
-    wm.scroll.area:addEventListener("touch", onArea);
-    wm.scroll:insert(wm.scroll.area);
-
-    wm.scroll:setMask(nil);
-    wm.scroll:setMask(mask);
-
-    print(wm.scroll.maskX, wm.scroll.maskY)
-
-    wm.scroll.maskX = values.cell * 9 * values.scale / 2 + values.wordmodule_x * values.scale + display.screenOriginX;
-    wm.scroll.maskY = values.cell * 9 * values.scale / 2 + (values.wordmodule_y + values.cell) * values.scale + display.screenOriginY;
-
-    print(wm.scroll.maskX, wm.scroll.maskY)
-
-    wm:insert(ui.runner{area = wm.scroll.area, size = values.cell * 9 * values.scale, sizefull = values.cell * 14 * values.scale});
-    ]]--
-
+    -- add control labels
     wm.duplicate = ui.myTextWithImage{name = "wm_duplicate"};
     wm.duplicate.wm = wm;
     wm.duplicate:addEventListener("touch", onDuplicate);
     wm.duplicate.isVisible = false;
-    -- wm.scroll.area:insert(wm.duplicate);
-    wm.scroll:insert(wm.duplicate);
+    wm.scroll.area:insert(wm.duplicate);
+
+    wm.goback = ui.myTextWithImage{name = "wm_goback"};
+    wm.goback.wm = wm;
+    wm.goback:addEventListener("touch", onGoback);
+    wm.goback.isVisible = false;
+    wm.scroll.area:insert(wm.goback);
 
     wm.clear = ui.myTextWithImage{name = "wm_clear"};
     wm.clear.wm = wm;
     wm.clear:addEventListener("touch", onClear);
     wm.clear.isVisible = false;
-    -- wm.scroll.area:insert(wm.clear);
-    wm.scroll:insert(wm.clear);
+    wm.scroll.area:insert(wm.clear);
 
     -- creating lines
     local count = 0;
@@ -614,10 +666,8 @@ local function wordModule(params)
         count = count + 1;
     end
 
-    -- print("LS", wm.scroll.numChildren, wm.numChildren);
-
     -- create lines from database, min 9 lines from 2 to 10
-    for i = 2, math.max(count + 1, 15) do
+    for i = 2, math.max(count + 1, 10) do
         wm:readLine({line = i, type = "line"});
     end
 
@@ -627,20 +677,16 @@ local function wordModule(params)
 
     wm.scroll.area:addScrollBar();
 
-    -- print("LF", wm.scroll.numChildren, wm.numChildren);
-
-    local name;
-
-    name = "wm_notindict";
-    wm.notindict = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
+    wm.notindict = ui.myText{name = "wm_notindict", refPoint = display.TopLeftReferencePoint};
     wm:insert(wm.notindict);
 
-    name = "wm_iknow";
-    wm.iknow = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
+    wm.iknow = ui.myText{name = "wm_iknow", refPoint = display.TopLeftReferencePoint};
     wm:insert(wm.iknow);
 
     wm.notindict.isVisible = false;
     wm.iknow.isVisible = false;
+
+    -- print(wm.line, wm.selected);
 
     return wm;
 end
@@ -666,20 +712,23 @@ function scene:createScene(event)
         start, finish = params.start or "", params.finish or "";
     end
 
+    -- create screen
     local screen = display.newGroup();
 
     -- module for words editing
     dbInit();
-    loadMain();
 
     -- clearing word module for new game
     if (start ~= "" and finish ~= "") then
         db_main:exec("DELETE FROM " .. gametable .. ";");
     end
 
+    -- load data to temp table
+    loadMain();
+
+    -- creating game module
     local wm = wordModule{start = start, finish = finish};
 
-    -- create screen
     screen:insert(ui.getBackground());
 
     screen.wm = wm;
@@ -695,6 +744,8 @@ function scene:createScene(event)
         if receiveButtonEvents == false then
             return false;
         end;
+
+        tmain = {};
 
         local sql = "DELETE FROM " .. gametable .. ";";
         db_main:exec(sql);
@@ -732,6 +783,7 @@ function scene:enterScene(event)
 
     if not db_main or not db_main:isopen() then
         dbInit();
+        loadMain();
     end
 end
 
@@ -739,6 +791,8 @@ function scene:exitScene(event)
     print("scPlay", "exitScene");
 
     receiveButtonEvents = false;
+
+    saveMain();
 
     if db_main and db_main:isopen() then
         db_main:close();
