@@ -42,6 +42,8 @@ function new(params)
 	scrollView.top = params.top or 0
 	scrollView.bottom = params.bottom or 0
 
+    print("scrollView", scrollView.top, scrollView.bottom, scrollView.height)
+
     function scrollView:onbegan(event)
         print(scrollView.y)
 
@@ -208,7 +210,10 @@ function new(params)
 		local scrollColorA = a or 120
 						
 		local viewPortH = screenH - self.top - self.bottom 
-		local scrollH = viewPortH*self.height/(self.height*2 - viewPortH)		
+		local scrollH = viewPortH*self.height/(self.height*2 - viewPortH)
+
+        -- print("ADD SCROLL BAR", viewPortH, screenH, scrollH, self.top, self.bottom, self.height)
+
 		-- local scrollBar = display.newRoundedRect(viewableScreenW-8,0,5,scrollH,2)
         local scrollBar = display.newRoundedRect(offsetScroll + display.screenOriginX,0,5,scrollH,2)
         scrollBar:setFillColor(scrollColorR, scrollColorG, scrollColorB, scrollColorA)

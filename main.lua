@@ -9,5 +9,7 @@
 
 local storyboard = require("storyboard");
 
+os.setlocale("ru");
+
 storyboard.gotoScene("scStart");
 

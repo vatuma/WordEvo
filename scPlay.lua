@@ -31,8 +31,14 @@ local path_words = system.pathForFile(values.db_name[values.game_language], syst
 
 local tmain = {}; -- table for game process
 
+local viewScreenW, viewScreenH = display.viewableContentWidth, display.viewableContentHeight;
+local offsetW, offsetH = display.screenOriginX, display.screenOriginY;
+
 local function loadMain()
-    local sql = "SELECT * FROM " .. gametable .. " ORDER BY type, line;";
+    tmain = {};
+
+    local sql = "SELECT * FROM " .. gametable .. " WHERE language='" .. values.game_language .. "' ORDER BY type, line;";
+    print("loadMain " .. gametable, sql);
 
     for row in db_main:nrows(sql) do
         local type = row.type;
@@ -50,25 +56,30 @@ local function loadMain()
         tmain[type] = ttype;
         tmain[type][line] = tline;
 
-        print(type, line, tline.word);
+        -- print(type, line, tline.word);
     end
+
+    print("loadMain " .. gametable, #tmain);
 end
 
 local function saveMain()
-    local sql = "DELETE FROM " .. gametable .. ";";
+    print("saveMain " .. gametable, #tmain);
+
+    local sql = "DELETE FROM " .. gametable .. " WHERE language='" .. values.game_language .. "';";
 
     for k,v in pairs(tmain) do
         for k1,v1 in pairs(v) do
-            -- print("INSERT", k, k1, v1.word, v1.selected, v1.modified, v1.off);
-
             local linelb = v1.linelb or "";
-            sql = sql .. "INSERT into " .. gametable .. " ('type', 'line', 'linelb', 'word', 'selected', 'modified', 'off') VALUES ('" .. k .. "'," .. k1 .. ",'" .. linelb .. "','" .. v1.word:lower() .. "'," .. v1.selected .. "," .. v1.modified .. "," .. v1.off .. ");";
+            sql = sql .. "INSERT into " .. gametable .. " ('type', 'line', 'linelb', 'word', 'selected', 'modified', 'off', 'language') VALUES ('"
+                    .. k .. "'," .. k1 .. ",'" .. linelb .. "','" .. values.myLower(v1.word) .. "'," .. v1.selected .. "," .. v1.modified .. "," .. v1.off .. ",'" .. values.game_language .. "');";
         end
     end
 
-    -- print(sql);
+    print(sql, #tmain);
 
     db_main:exec(sql);
+
+    -- tmain = {};
 end
 
 -- call back button
@@ -94,8 +105,13 @@ local function wordModule(params)
     -- create word module
     local wm = display.newGroup();
 
+    wm.level = params.level or 0;
+    wm.steps_min = params.steps_min or 0;
     wm.start = params.start or ""; -- start word
     wm.finish = params.finish or ""; -- finish word
+
+    -- print("steps_min = " .. wm.steps_min)
+    -- ui.toast{text = "steps_min = " .. wm.steps_min};
 
     wm.line = 2; -- edited line
     wm.selected = 2; -- edited position of letter (first is row number)
@@ -114,7 +130,7 @@ local function wordModule(params)
         self.notindict.isVisible = true;
         self.iknow.isVisible = true;
 
-        local sql = "SELECT * FROM dict WHERE word='" .. string.lower(word) .. "';";
+        local sql = "SELECT * FROM dict WHERE word='" .. values.myLower(word) .. "';";
         for row in db_words:nrows(sql) do
             -- hide label about incorrect word
             self.notindict.isVisible = false;
@@ -125,6 +141,55 @@ local function wordModule(params)
         end
 
         return result;
+    end
+
+    -- finish current game and save results
+    function wm:completeGame()
+        local count = wm.line - 1;
+        local sqlupdate = "";
+        local is_insert = true;
+        local sql = "SELECT * FROM results WHERE start='" .. wm.start .. "' AND finish='" .. wm.finish .. "';";
+
+        for row in db_main:nrows(sql) do
+            local steps = row.steps;
+
+            if steps > count then
+                sqlupdate = "UPDATE results SET steps=" .. count .. " WHERE start='" .. wm.start .. "' AND finish='" .. wm.finish .. "';";
+            end
+
+            is_insert = false;
+        end
+
+        if is_insert then
+            sqlupdate = "INSERT INTO results ('start','finish','steps','rated') VALUES ('" .. wm.start .. "','" .. wm.finish .. "'," .. count .. ",0);";
+        end
+
+        if gametable == values.tblcampaign then
+            sqlupdate = sqlupdate .. "UPDATE OR IGNORE campaign SET steps=" .. count .. " WHERE level=" .. self.level .. " AND language='" .. values.game_language .. "';";
+            sqlupdate = sqlupdate .. "UPDATE OR IGNORE campaign SET enable=" .. 1 .. " WHERE level=" .. self.level + 1 .. " AND language='" .. values.game_language .. "';";
+        end
+
+        sqlupdate = sqlupdate .. "DELETE FROM " .. gametable .. " WHERE language='" .. values.game_language .. "';";
+        db_main:exec(sqlupdate);
+
+        tmain = {};
+
+        print(sqlupdate);
+        print("completeGame", wm.start, wm.finish, count, wm.steps_min, gametable)
+
+        local options =
+        {
+            params = {
+                start = wm.start,
+                finish = wm.finish,
+                level = wm.level,
+                steps = count,
+                steps_min = wm.steps_min,
+                gametype = gametable,
+            }
+        }
+
+        storyboard:gotoScene("scComplete", options);
     end
 
     function wm:gotoDuplicate()
@@ -280,7 +345,7 @@ local function wordModule(params)
             -- change label by keyboard event
             function letter:setLbl(label)
                 if (self.line == self.wordmodule.line and self.position == self.wordmodule.selected) then
-                    self.label.text = string.upper(label);
+                    self.label.text = values.myUpper(label);
                 end
 
                 return self.label.text or "#";
@@ -311,7 +376,7 @@ local function wordModule(params)
             letter.back:setReferencePoint(display.TopLeftReferencePoint);
             letter:insert(letter.back);
 
-            letter.label = display.newText(string.upper(params.label or ""), 0, 0, values.font, 18 * 2);
+            letter.label = display.newText(values.myUpper(params.label or ""), 0, 0, values.font, 18 * 2);
             letter.label.xScale = 0.5; letter.label.yScale = 0.5;
             letter.label:setReferencePoint(display.CenterReferencePoint);
             letter.label:setTextColor(color[1], color[2], color[3]);
@@ -328,7 +393,7 @@ local function wordModule(params)
                 letter.label.alpha = 0;
                 letter.label:setTextColor(values.color_blue[1], values.color_blue[2], values.color_blue[3]);
 
-                letter.labeld = display.newText(string.upper(params.label or ""), 0, 0, values.font, 18 * 2);
+                letter.labeld = display.newText(values.myUpper(params.label or ""), 0, 0, values.font, 18 * 2);
                 letter.labeld.xScale = 0.5; letter.labeld.yScale = 0.5;
                 letter.labeld:setReferencePoint(display.CenterReferencePoint);
                 letter.labeld:setTextColor(color[1], color[2], color[3]);
@@ -362,29 +427,32 @@ local function wordModule(params)
             wl.wordmodule.clear_max = math.max(wl.wordmodule.clear_max, wl.line);
         end
 
-        print(wl.type, wl.line, wl.word)
-
+        -- print("CREATE WORDLINE", wl.word, string.len(wl.word), #wl.word, string.byte(wl.word, 1, #wl.word))
         -- create all letters of word
-        for i = 1, #wl.word + 1 do
+        -- for i = 1, #wl.word + 1 do
+        for i = 1, values.getWordLenght(wl.word) + 1 do
             local label;
             if i == 1 then
                 if wl.linelb == "" then
                     label = wl.line;
+                    -- label = wl.word
                 else
                     label = wl.linelb;
                 end
             else
-                label = string.sub(wl.word, i - 1, i - 1);
+                -- label = string.sub(wl.word, i - 1, i - 1);
+                label = values.getLetter(wl.word, i - 1);
             end
 
+            -- print("CREATE LABEL", wl.word:upper(), i, label); -- ui.toast{text = wl.word}
             local pos = "pos" .. i;
 
             local top = 0;
-            local left = (values.wordmodule_x + (i - 1) * cell) * values.scale + display.screenOriginX;
+            local left = (values.wordmodule_x + (i - 1) * cell) * values.scale + offsetW;
             if wl.type == "line" then
-                top = ((wl.line - 2) * cell) * values.scale + display.screenOriginY;
+                top = ((wl.line - 2) * cell) * values.scale;
             else
-                top = (values.wordmodule_y + (wl.line - 1) * cell) * values.scale + display.screenOriginY;
+                top = (values.wordmodule_y + (wl.line - 1) * cell) * values.scale + offsetH;
             end
 
             local function newLetter(params)
@@ -425,24 +493,29 @@ local function wordModule(params)
             end
 
             wl:insert(wl[pos]);
+
         end
+
+        -- print("WORDLINE", wl.line, wl.x, wl.y, wl.height)
 
         -- change selected letter in selected word
         function wl:setLbl(label)
             -- trying to change label letter by letter
             local newWord = "";
-            for j = 1, #self.word + 1 do
+            -- for j = 1, #self.word + 1 do
+            for j = 1, values.getWordLenght(self.word) + 1 do
                 if (j > 1) then
                     newWord = newWord .. self["pos" .. j]:setLbl(label);
                 end
             end
 
             -- change word in database
-            if (self.word:lower() ~= newWord:lower()) then
+            if (values.myLower(self.word) ~= values.myLower(newWord)) then
                 if (self.wordmodule:checkWord(newWord)) then
 
-                    self.wordmodule:updateWord{word = newWord};
-                    self.wordmodule:showDuplicate{};
+                    if self.wordmodule:updateWord{word = newWord} then
+                        self.wordmodule:showDuplicate{};
+                    end
                 end
             end
         end
@@ -452,7 +525,20 @@ local function wordModule(params)
 
     -- change word in database
     function wm:updateWord(params)
-        local word = params.word:lower();
+        local word = values.myLower(params.word);
+
+        local count = 0;
+        for k,v in pairs(tmain["line"]) do
+            count = count + 1;
+        end
+
+        -- finish game
+        print("finish game", "<" .. word .. ">", "<" .. self.finish .. ">")
+        if word == self.finish then
+            self:completeGame();
+
+            return false;
+        end
 
         local line = self.line;
         local newLine = line + 1;
@@ -460,12 +546,7 @@ local function wordModule(params)
         tmain["line"][line].word = word;
         tmain["line"][line].modified = 1;
 
-        local count = 0;
-        for k,v in pairs(tmain["line"]) do
-            count = count + 1;
-        end
-
-        print("update", count, newLine);
+        -- print("update", count, newLine);
 
         if count < newLine + 2 then
             local nl = count + 2;
@@ -480,15 +561,21 @@ local function wordModule(params)
             tmain["finish"][values.finish_line].modified = 1;
         end
 
+        --[[
         for k,v in pairs(tmain["line"]) do
             print("updateline", k, v.word);
         end
+        ]]--
 
         tmain["line"][newLine].word = word;
         tmain["line"][newLine].modified = 1;
 
         -- positioning on added line
         self:selectLine{line = newLine, selected = 2, update = true};
+
+        self:setScrollBackground();
+
+        return true;
     end
 
     -- update info about selected line on database
@@ -524,6 +611,8 @@ local function wordModule(params)
 
         local sql;
         local count = 0;
+
+        print("readLine " .. #tmain)
 
         -- searching word in table by line and type
         local isnew = false;
@@ -600,23 +689,46 @@ local function wordModule(params)
 
     -- update modified lines
     function wm:updateColors(params)
+        -- print(params.all, #tmain)
+
         for kt,vt in pairs(tmain) do
             for k,v in pairs(vt) do
                 if v.modified == 1 then
-                    print(kt, k, v.word);
+                    -- print(kt, k, v.word);
 
                     self:readLine{line = k, type = kt};
                     v.modified = 0;
                 end
             end
         end
+
+        -- print(params.all, #tmain)
     end
 
     -- get letter from keyboard
     function wm:receiveLetter(letter)
+        if receiveButtonEvents == false then
+            return false;
+        end;
+
         print("scPlay", "receiveLetter", letter, self.line, self.selected);
 
         self.lines["line" .. self.line]:setLbl(letter);
+    end
+
+    function wm:setScrollBackground()
+        local maxline = math.max(#tmain["line"], 10);
+
+        self.scroll.area:remove(wm.scroll.area.scrollBackground);
+
+        self.scroll.area.scrollBackground = display.newRect(0, 0, values.wordmodule_width * values.scale, (maxline - 1) * values.cell * values.scale)
+        self.scroll.area.scrollBackground:setFillColor(255, 255, 255, 200);
+        self.scroll.area:insert(1, wm.scroll.area.scrollBackground);
+
+        -- wm.scroll.area:removeScrollBar();
+        self.scroll.area:addScrollBar();
+
+        print("setScrollBackground", self.scroll.area.scrollBackground.x, self.scroll.area.scrollBackground.y, self.scroll.area.scrollBackground.height)
     end
 
     -- get start and finish lines
@@ -627,19 +739,34 @@ local function wordModule(params)
     wm.scroll = display.newGroup();
     wm:insert(wm.scroll);
 
-    wm.scroll.area = scrollView.new{top = (values.wordmodule_y + values.cell) * values.scale + display.screenOriginY,
-        bottom = display.contentHeight - (values.wordmodule_y + values.cell * 10) * values.scale - display.screenOriginY,
-        offsetScroll = values.cell * (#wm.start + 3) * values.scale};
+    local tops = (values.wordmodule_y + values.cell) * values.scale + offsetH;
+    local bottoms = viewScreenH - (values.wordmodule_y + values.cell * 10) * values.scale - offsetH;
+
+    -- print("TOP BOTTOM", tops, bottoms, offsetW, offsetH)
+    -- print(display.contentHeight, display.viewableContentHeight, values.wordmodule_y, display.screenOriginY, (values.wordmodule_y + values.cell * 10), (values.wordmodule_y + values.cell * 10) * values.scale)
+
+    -- print(wm.start, wm.finish);
+
+    wm.scroll.area = scrollView.new{
+        top = tops,
+        bottom = bottoms,
+        offsetScroll = values.cell * (values.myLenght(wm.start) + 3) * values.scale,
+    };
     wm.scroll:insert(wm.scroll.area);
 
     -- masking scroll area
-    local mask = graphics.newMask("images/tmp.jpg", system.ResourceDirectory);
+    local mask;
+    if viewScreenH < display.contentHeight then
+        mask = graphics.newMask("images/playMaskIpad.jpg", system.ResourceDirectory);
+    else
+        mask = graphics.newMask("images/playMask.jpg", system.ResourceDirectory);
+    end
 
     wm.scroll:setMask(nil);
     wm.scroll:setMask(mask);
 
-    wm.scroll.maskX = values.cell * 9 * values.scale / 2 + values.wordmodule_x * values.scale + display.screenOriginX;
-    wm.scroll.maskY = values.cell * 9 * values.scale / 2 + (values.wordmodule_y + values.cell) * values.scale + display.screenOriginY;
+    wm.scroll.maskX = values.cell * 9 * values.scale / 2 + values.wordmodule_x * values.scale + offsetW;
+    wm.scroll.maskY = values.cell * 9 * values.scale / 2 + (values.wordmodule_y + values.cell) * values.scale + offsetH;
 
     -- add control labels
     wm.duplicate = ui.myTextWithImage{name = "wm_duplicate"};
@@ -662,18 +789,19 @@ local function wordModule(params)
 
     -- creating lines
     local count = 0;
-    for row in db_main:nrows("SELECT * FROM " .. gametable .. " WHERE type='line';") do
+    for row in db_main:nrows("SELECT * FROM " .. gametable .. " WHERE type='line' AND language='" .. values.game_language .. "';") do
         count = count + 1;
     end
 
     -- create lines from database, min 9 lines from 2 to 10
-    for i = 2, math.max(count + 1, 10) do
+    local maxline = math.max(count + 1, 10);
+    for i = 2, maxline do
         wm:readLine({line = i, type = "line"});
     end
 
-    local scrollBackground = display.newRect(0, 0, values.wordmodule_width * values.scale, 14 * values.cell * values.scale)
-    scrollBackground:setFillColor(255, 255, 255, 200)
-    wm.scroll.area:insert(1, scrollBackground)
+    wm:setScrollBackground();
+
+    print("SCROLL AREA", wm.scroll.area.x, wm.scroll.area.y, wm.scroll.area.height)
 
     wm.scroll.area:addScrollBar();
 
@@ -703,12 +831,12 @@ function scene:createScene(event)
 
     local params = event.params;
     local name;
-    local start, finish = "", "";
+    local start, finish = "", ""; print(start, finish)
 
     gametable = values.tblsingleplay;
 
     if params then
-        gametable = params.gametable or values.tblsingleplay;
+        gametable = params.gametype or values.tblsingleplay;
         start, finish = params.start or "", params.finish or "";
     end
 
@@ -720,14 +848,16 @@ function scene:createScene(event)
 
     -- clearing word module for new game
     if (start ~= "" and finish ~= "") then
-        db_main:exec("DELETE FROM " .. gametable .. ";");
+        db_main:exec("DELETE FROM " .. gametable .. " WHERE language='" .. values.game_language .. "';");
     end
 
     -- load data to temp table
     loadMain();
 
+    -- print(start, values.myLower(start), finish, values.myLower(finish));
+
     -- creating game module
-    local wm = wordModule{start = start, finish = finish};
+    local wm = wordModule{start = values.myLower(start), finish = values.myLower(finish), steps_min = params.steps_min or 0, level = params.level};
 
     screen:insert(ui.getBackground());
 
@@ -744,11 +874,12 @@ function scene:createScene(event)
         if receiveButtonEvents == false then
             return false;
         end;
+        print(gametable);
+
+        local sql = "DELETE FROM " .. gametable .. " WHERE language='" .. values.game_language .. "';";
+        db_main:exec(sql);
 
         tmain = {};
-
-        local sql = "DELETE FROM " .. gametable .. ";";
-        db_main:exec(sql);
 
         storyboard.gotoScene("scStart");
     end
@@ -772,6 +903,8 @@ function scene:createScene(event)
     -- add fixed keyboard
     screen.keyboard = Keyboard:new({wm = wm});
     screen:insert(screen.keyboard);
+
+    scene.screen = screen;
 end
 
 function scene:enterScene(event)
@@ -783,8 +916,10 @@ function scene:enterScene(event)
 
     if not db_main or not db_main:isopen() then
         dbInit();
-        loadMain();
     end
+
+    -- loadMain();
+    -- scene.screen.wm:updateColors{all = true};
 end
 
 function scene:exitScene(event)

@@ -34,7 +34,7 @@ end
 
 -- get words for play depend on game type
 local function getPlayWords()
-    local start, finish, error = "", "", "";
+    local start, finish, error, steps_min = "", "", "", 0;
     local type = preference.getValue("type") or "type_random";
 
     if (type == "type_random") then
@@ -74,34 +74,41 @@ local function getPlayWords()
         end
 
         start, finish = startFinish();
+        steps_min = values.getLevel{start = start, finish = finish};
 
-        print("random game", start, finish);
-
-        while (values.getLevel{start = start, finish = finish} == 0) do
+        while (steps_min <= 0) do
             start, finish = startFinish();
-            print("random game", start, finish);
+            steps_min = values.getLevel{start = start, finish = finish};
         end
-
-        print("random game", start, finish);
 
     elseif (type == "type_interest") then
 
-        start = preference.getValue("start_interest") or "";
-        finish = preference.getValue("finish_interest") or "";
+        start = string.gsub((preference.getValue("start_interest" .. values.game_language) or ""), " ", "");
+        finish = string.gsub((preference.getValue("finish_interest" .. values.game_language) or ""), " ", "");
+        steps_min = preference.getValue("steps_min_interest" .. values.game_language) or "";
 
     elseif (type == "type_own") then
+        -- print(preference.getValue("start_own" .. values.game_language) or "", preference.getValue("finish_own" .. values.game_language) or "")
 
-        start = preference.getValue("start_own") or "";
-        finish = preference.getValue("finish_own") or "";
+        start = string.gsub((preference.getValue("start_own" .. values.game_language) or ""), " ", "");
+        finish = string.gsub((preference.getValue("finish_own" .. values.game_language) or ""), " ", "");
 
         -- check possibility to construct a chain
-        if (values.getLevel{start = start, finish = finish}) then
+        if #start ~= #finish then
+            error = "diffrent lenght of words";
         else
-            error = "chain construct is impossible";
+            steps_min = values.getLevel{start = start, finish = finish};
+        end
+
+        if (steps_min > 0) then
+        else
+            if error == "" then
+                error = "chain construct is impossible";
+            end
         end;
     end
 
-    return start, finish, error;
+    return start, finish, error, steps_min;
 end
 
 local function onBtnPlayRelease()
@@ -111,17 +118,17 @@ local function onBtnPlayRelease()
         return false;
     end;
 
-    local start, finish, error = getPlayWords();
+    local start, finish, error, steps_min = getPlayWords();
 
     if (error ~= "") then
-        -- toast about error
-        print(error);
+        ui.toast{text = error};
     else
         local options =
         {
             params = {
                 start = start,
                 finish = finish,
+                steps_min = steps_min,
                 gametype = values.type_singleplay,
             }
         }
@@ -173,6 +180,10 @@ local function selectModule(params)
     local countW, countH = values.getImageSizes("images/o_3.png");
     local typeW, typeH = values.getImageSizes("images/type_random.png");
     local buttonW, buttonH = values.getImageSizes("images/btn_border_1.png");
+
+    function sm:refresh()
+        sm.detailsline:refresh();
+    end
 
     -- create single image
     local function singleImage(params)
@@ -311,6 +322,15 @@ local function selectModule(params)
             end
         end
 
+        function dl:refresh()
+            print("dl:refresh", preference.getValue("start_interest" .. values.game_language) or "", preference.getValue("finish_interest" .. values.game_language) or "")
+
+            dl.type_own.wordmodule:refresh();
+
+            dl.type_interest.wordstart.text = preference.getValue("start_interest" .. values.game_language) or "";
+            dl.type_interest.wordfinish.text = preference.getValue("finish_interest" .. values.game_language) or "";
+        end
+
         function dl:selectType()
             for k, v in pairs(self.types) do
                 v.isVisible = k == self.parent.type;
@@ -374,12 +394,12 @@ local function selectModule(params)
 
         name = "selectpair_ws";
         type_interest.wordstart = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
-        type_interest.wordstart.text = preference.getValue("start_interest") or "";
+        type_interest.wordstart.text = preference.getValue("start_interest" .. values.game_language) or "";
         type_interest:insert(type_interest.wordstart);
 
         name = "selectpair_wf";
         type_interest.wordfinish = ui.myText{name = name, refPoint = display.TopLeftReferencePoint};
-        type_interest.wordfinish.text = preference.getValue("finish_interest") or "";
+        type_interest.wordfinish.text = preference.getValue("finish_interest" .. values.game_language) or "";
         type_interest:insert(type_interest.wordfinish);
 
         dl.type_interest = type_interest;
@@ -407,18 +427,35 @@ local function selectModule(params)
 
             wm.line = 1;
             wm.selected = 0;
-            wm.ws = preference.getValue("start_own") or "     ";
-            wm.wf = preference.getValue("finish_own") or "     ";
+            wm.ws = preference.getValue("start_own" .. values.game_language) or string.rep(" ", 5);
+            wm.wf = preference.getValue("finish_own" .. values.game_language) or string.rep(" ", 5);
 
             local top = 505;
             local left = 246;
 
             -- define sizes of image
-            local image = display.newImage("images/sq_bg_null_full.png");
+            local image = display.newImage("images/sq_bg_grey.png");
             local width = image.width * scale;
             local height = image.height * scale;
             image:removeSelf();
             image = nil;
+
+            function wm:refresh()
+                -- refresh own words
+                self.ws = preference.getValue("start_own" .. values.game_language) or string.rep(" ", 5);
+                self.wf = preference.getValue("finish_own" .. values.game_language) or string.rep(" ", 5);
+
+                self:updateColors{show = false};
+
+                -- recreate keyboard
+                self:remove(self.keyboard);
+                self.keyboard = nil;
+
+                self.keyboard = Keyboard:new{wm = self};
+                self:insert(self.keyboard);
+
+                self:showKeyboard(false);
+            end
 
             local function wordLine(params)
                 -- create word line object
@@ -446,7 +483,10 @@ local function selectModule(params)
                     -- change label by keyboard event
                     function letter:setLbl(label)
                         if (self.line == self.parent.parent.line and self.position == self.parent.parent.selected) then
-                            self.label.text = string.upper(label);
+                            -- self.label.text = string.upper(label);
+                            self.label.text = label;
+                            print(label:byte(1, #label));
+                            print(self.label.text:byte(1, #self.label.text));
                         end
 
                         return self.label.text;
@@ -495,9 +535,17 @@ local function selectModule(params)
                 wl.line = params.line;
                 wl.selected = params.selected;
 
+                if wl.word == "" then
+                    wl.word = string.rep(" ", 5);
+                end
+
+                -- print("wordline", wl.word, wl.line, #wl.word)
+
                 -- create all letters of word
-                for i = 1, #wl.word do
-                    local label = string.sub(wl.word, i, i);
+                for i = 1, values.getWordLenght(wl.word) do
+                    print("setlbl", i, wl.word, values.getWordLenght(wl.word))
+
+                    local label = values.getLetter(wl.word, i, i);
 
                     local pos = "pos" .. i;
 
@@ -530,7 +578,7 @@ local function selectModule(params)
                 function wl:setLbl(label)
                     -- trying to change label letter by letter
                     local newWord = "";
-                    for j = 1, #self.word do
+                    for j = 1, values.getWordLenght(self.word) do
                         newWord = newWord .. self["pos" .. j]:setLbl(label);
                     end
 
@@ -559,6 +607,12 @@ local function selectModule(params)
             end
 
             function wm:receiveLetter(letter)
+                print("single play receive letter")
+
+                if letter == "#" then
+                    letter = " ";
+                end
+
                 if self.line == 1 then
                     self.ws = self.start:setLbl(letter);
                 else
@@ -589,7 +643,9 @@ local function selectModule(params)
                     target.parent.selected = 0;
                     target.parent:updateColors{show = false};
 
-                    preference.save{start_own = string.gsub(target.parent.ws, " ", ""), finish_own = string.gsub(target.parent.wf, " ", "")};
+                    preference.save{
+                        ["start_own" .. values.game_language] = target.parent.ws,
+                        ["finish_own" .. values.game_language] = target.parent.wf};
                 end
 
                 return true;
@@ -638,44 +694,58 @@ local function selectModule(params)
     return sm;
 end
 
+function scene:unlock(state)
+    receiveButtonEvents = state;
+end
+
+function scene:refresh()
+    self.screen.sm:refresh();
+end
+
 function scene:createScene(event)
     print("scSinglePlay", "createScene");
 
     display.setStatusBar(display.HiddenStatusBar);
+    --os.setlocale("Russian_Russia.1251");
 
-    local screen = display.newGroup();
+    scene.screen = display.newGroup();
 
     dbInit();
 
-    screen:insert(ui.getBackground());
+    scene.screen:insert(ui.getBackground());
 
     local width, height = values.getImageSizes("images/btn_border_1.png");
 
-    screen.play = ui.myButton{
+    scene.screen.play = ui.myButton{
         id = "play_single",
         onRelease = onBtnPlayRelease,
         width = width,
         height = height,
         scale = values.scale
     };
-    screen:insert(screen.play);
-    btn_play = screen.play;
+    scene.screen:insert(scene.screen.play);
+    btn_play = scene.screen.play;
 
-    screen.back = ui.myBackButton{scene = storyboard.getCurrentSceneName()};
-    screen.back:addEventListener("touch", onBackBtn);
-    screen:insert(screen.back);
+    scene.screen.back = ui.myBackButton{scene = storyboard.getCurrentSceneName()};
+    scene.screen.back:addEventListener("touch", onBackBtn);
+    scene.screen:insert(scene.screen.back);
 
     -- create select module
-    screen.sm = selectModule();
-    screen:insert(screen.sm);
+    scene.screen.sm = selectModule();
+    scene.screen:insert(scene.screen.sm);
 
-    -- print(storyboard.getCurrentSceneName());
+    scene.screen.langl = ui.myText{name = "langl", refPoint = display.TopLeftReferencePoint};
+    scene.screen:insert(scene.screen.langl);
+
+    scene.screen.lang = ui.myLanguage(self);
+    scene.screen:insert(scene.screen.lang);
 end
 
 function scene:enterScene(event)
     print("scSinglePlay", "enterScene");
 
     receiveButtonEvents = true;
+    scene.screen.lang.isVisible = true;
 
     storyboard.purgeScene(storyboard.getPrevious());
 
@@ -688,6 +758,7 @@ function scene:exitScene(event)
     print("scSinglePlay", "exitScene");
 
     receiveButtonEvents = false;
+    scene.screen.lang.isVisible = false;
 
     if db_main and db_main:isopen() then
         db_main:close();

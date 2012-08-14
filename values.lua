@@ -9,6 +9,7 @@
 module(..., package.seeall);
 
 local sqlite = require("sqlite3");
+-- os.setlocale("Russian_Russia.1251");
 
 -- scaling
 cell = 51;
@@ -19,6 +20,9 @@ wordmodule_y = 153;
 wordmodule_width = 612;
 wordmodule_height = 459;
 
+campaign_x = 102;
+campaign_y = 153;
+
 -- localization
 en = "en";
 ru = "ru";
@@ -27,6 +31,10 @@ game_language = en;
 db_name = {
     [en] = "dict/dicten.sqlite",
     [ru] = "dict/dictrus.sqlite",
+}
+language_name = {
+    [en] = "english",
+    [ru] = "русский",
 }
 
 -- game types
@@ -42,23 +50,55 @@ finish_line = 11;
 
 alphabet = {
     [en] = {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "u", "v", "w", "t", "x", "y", "z"},
+    [ru] = {"а", "б", "в", "г", "д", "е", "ё", "ж", "з", "и", "й", "к", "л", "м", "н", "о", "п", "р", "с", "т", "у", "ф", "х", "ц", "ч", "ш", "щ", "ь", "ы", "ъ", "э", "ю", "я"},
 }
 
 vowels = {
     [en] = {"a", "e", "i", "o", "u", "y"},
+    [ru] = {"а", "е", "ё", "и", "о", "у", "ы", "э", "ю", "я"},
+}
+
+demo = {
+    [en] = {{"1", "M", "A", "K", "E"}, {"2", "M", "A", "R", "E"}, {"3", "M", "E", "R", "E"}, {"4", "M", "E", "R", "L"}, {"5"}, {"6"}, {"7"}, {"8"}, {"9"}, {"10"}, {"11", "D", "E", "A", "L"}},
+    [ru] = {},
 }
 
 -- font and colors
 font = "Vatuma Script slc";
+-- font = native.newFont("Vatuma Script slc");
 color_blue =  {76,  70,  149};
 color_red  =  {255, 0,   0};
-color_green = {0,   255, 0};
+color_green = {19,  148, 40};
 color_grey =  {127, 134, 145};
+
+demo_scheme = {
+    [en] = {
+        {act = "visible", row = 2, cols = 5, visible = false},
+        {act = "visible", row = 3, cols = 5, visible = false},
+        {act = "visible", row = 4, cols = 5, visible = false},
+        {act = "change", row = 2, col = 4, text = "K", delay = 500},
+        {act = "visible", row = 2, cols = 5, visible = true, delay = 500},
+        {act = "select", row = 2, col = 4, color = color_red, delay = 1000},
+        {act = "change", row = 2, col = 4, text = "R", delay = 1500},
+        {act = "change", row = 3, col = 3, text = "A", delay = 2000},
+        {act = "visible", row = 3, cols = 5, visible = true, delay = 2000},
+        {act = "select", row = 2, col = 4, color = color_blue, delay = 2500},
+        {act = "select", row = 3, col = 3, color = color_red, delay = 3000},
+        {act = "change", row = 3, col = 3, text = "E", delay = 3500},
+        {act = "change", row = 4, col = 5, text = "E", delay = 4000},
+        {act = "visible", row = 4, cols = 5, visible = true, delay = 4000},
+        {act = "select", row = 3, col = 3, color = color_blue, delay = 4500},
+        {act = "select", row = 4, col = 5, color = color_red, delay = 5000},
+        {act = "change", row = 4, col = 5, text = "L", delay = 5500},
+        {act = "select", row = 4, col = 5, color = color_blue, delay = 6000},
+    },
+    [ru] = {},
+}
 
 buttons = {
     campaign = {
         x = 344,
-        y = 182,
+        y = 131,
         fontSize = 40,
         textColor = color_blue,
         default = "images/btn_border_1.png",
@@ -68,7 +108,7 @@ buttons = {
     },
     single_play = {
         x = 344,
-        y = 333,
+        y = 282,
         fontSize = 40,
         textColor = color_blue,
         default = "images/btn_border_2.png",
@@ -78,13 +118,23 @@ buttons = {
     },
     rules = {
         x = 344,
-        y = 484,
+        y = 436,
         fontSize = 40,
         textColor = color_blue,
         default = "images/btn_border_4.png",
         over = "images/btn_border_4_pressed.png",
         [en] = "Rules",
         [ru] = "Правила",
+    },
+    results = {
+        x = 344,
+        y = 592,
+        fontSize = 40,
+        textColor = color_blue,
+        default = "images/btn_border_4.png",
+        over = "images/btn_border_4_pressed.png",
+        [en] = "Results",
+        [ru] = "Результаты",
     },
     play_single = {
         x = 344,
@@ -101,7 +151,7 @@ buttons = {
         y = 200,
         default = "images/type_random.png",
         over = "images/type_random_selected.png",
-        [en] = "Случайная - случайный выбор слов",
+        [en] = "Random - random select words",
         [ru] = "Случайная - случайный выбор слов",
     },
     type_interest = {
@@ -109,7 +159,7 @@ buttons = {
         y = 200,
         default = "images/type_interest.png",
         over = "images/type_interest_selected.png",
-        [en] = "Интересная - выбор из лучших пар",
+        [en] = "Interest - select top pairs",
         [ru] = "Интересная - выбор из лучших пар",
     },
     type_own = {
@@ -117,7 +167,7 @@ buttons = {
         y = 200,
         default = "images/type_own.png",
         over = "images/type_own_selected.png",
-        [en] = "Своя игра - ввод своих слов",
+        [en] = "Own game - enter own words",
         [ru] = "Своя игра - ввод своих слов",
     },
     count_3 = {
@@ -143,7 +193,7 @@ buttons = {
         y = 508,
         default = "images/o_r.png",
         over = "images/o_r_selected.png",
-        [en] = "Своя игра - ввод своих слов",
+        [en] = "Own game - enter own words",
         [ru] = "Своя игра - ввод своих слов",
     },
     selectpair = {
@@ -156,6 +206,36 @@ buttons = {
         [en] = "Select pair\n of words",
         [ru] = "Выбрать\n пару слов:",
     },
+    replay = {
+        x = 51,
+        y = 459,
+        default = "images/complete.png",
+        over = "images/complete_pressed.png",
+        textColor = color_blue,
+        fontSize = 28,
+        [en] = "replay",
+        [ru] = "повторить",
+    },
+    quit = {
+        x = 204,
+        y = 459,
+        default = "images/complete.png",
+        over = "images/complete_pressed.png",
+        textColor = color_blue,
+        fontSize = 28,
+        [en] = "quit",
+        [ru] = "выход",
+    },
+    continue = {
+        x = 357,
+        y = 459,
+        default = "images/complete.png",
+        over = "images/complete_pressed.png",
+        textColor = color_blue,
+        fontSize = 28,
+        [en] = "continue",
+        [ru] = "продолжить",
+    },
     kill_stop = {
         x = 396,
         y = 78,
@@ -165,6 +245,16 @@ buttons = {
         textColor = color_red,
         [en] = "Stop",
         [ru] = "Закончить",
+    },
+    results_close = {
+        x = 192,
+        y = 847,
+        default = "images/btn_border_1.png",
+        over = "images/btn_border_1_pressed.png",
+        fontSize = 40,
+        textColor = color_blue,
+        [en] = "Close",
+        [ru] = "Закрыть",
     },
 }
 
@@ -226,7 +316,7 @@ labels = {
         [ru] = "Выбрать пару слов (от 3 до 5 букв):",
     },
     selectpair_own_sl = {
-        x = 102,
+        x = 51,
         y = 510,
         fontSize = 36,
         textColor = color_blue,
@@ -234,7 +324,7 @@ labels = {
         [ru] = "Начальное",
     },
     selectpair_own_fl = {
-        x = 102,
+        x = 51,
         y = 561,
         fontSize = 36,
         textColor = color_blue,
@@ -250,7 +340,6 @@ labels = {
         [ru] = "Готово",
     },
     selectpair_interest = {
-        x = 153,
         y = 10,
         fontSize = 36,
         textColor = color_blue,
@@ -334,6 +423,150 @@ labels = {
         [en] = "clear all words",
         [ru] = "слова ниже будут удалены",
     },
+    complete_campaign = {
+        x = 255,
+        y = 0,
+        fontSize = 40,
+        textColor = color_green,
+        [en] = "Level completed!",
+        [ru] = "Уровень завершен!",
+    },
+    complete_singleplay = {
+        x = 255,
+        y = 0,
+        fontSize = 40,
+        textColor = color_green,
+        [en] = "Game completed!",
+        [ru] = "Игра завершена",
+    },
+    complete_stars = {
+        x = 255,
+        y = 102,
+        fontSize = 80,
+        textColor = color_red,
+        [en] = "*",
+        [ru] = "*",
+    },
+    complete_like = {
+        x = 255,
+        y = 204,
+        fontSize = 36,
+        textColor = color_blue,
+        [en] = "I like this word pair!",
+        [ru] = "Мне нравится эта пара слов!",
+    },
+    complete_lsteps = {
+        x = 51,
+        y = 306,
+        fontSize = 36,
+        textColor = color_blue,
+        [en] = "Value of steps:",
+        [ru] = "Количество шагов:",
+    },
+    complete_lsteps_min = {
+        x = 51,
+        y = 357,
+        fontSize = 36,
+        textColor = color_blue,
+        [en] = "Minimum of steps:",
+        [ru] = "Минимум шагов:",
+    },
+    complete_steps = {
+        x = 433,
+        y = 306,
+        fontSize = 36,
+        textColor = color_blue,
+        [en] = "0",
+        [ru] = "0",
+    },
+    complete_steps_min = {
+        x = 433,
+        y = 357,
+        fontSize = 36,
+        textColor = color_blue,
+        [en] = "0",
+        [ru] = "0",
+    },
+    title_results = {
+        x = 0,
+        y = 0,
+        fontSize = 60,
+        textColor = color_blue,
+        [en] = "Results",
+        [ru] = "Результаты",
+    },
+    start_results = {
+        x = 0,
+        y = 0,
+        fontSize = 60,
+        textColor = color_blue,
+        [en] = "WORDEVO",
+        [ru] = "МУХОСЛОН",
+    },
+    allchains = {
+        x = 459,
+        y = 153,
+        fontSize = 36,
+        textColor = color_blue,
+        [en] = "0",
+        [ru] = "0",
+    },
+    lallchains = {
+        x = 102,
+        y = 153,
+        fontSize = 36,
+        textColor = color_blue,
+        [en] = "All chains:",
+        [ru] = "Всего решено цепочек:",
+    },
+    res_start = {
+        x = 51,
+        y = 10,
+        fontSize = 32,
+        textColor = color_blue,
+        [en] = "Start",
+        [ru] = "Начальное",
+    },
+    res_finish = {
+        x = 255,
+        y = 10,
+        fontSize = 32,
+        textColor = color_blue,
+        [en] = "Finish",
+        [ru] = "Конечное",
+    },
+    res_steps = {
+        x = 469,
+        y = 10,
+        fontSize = 32,
+        textColor = color_blue,
+        [en] = "S",
+        [ru] = "Ш",
+    },
+    res_rated = {
+        x = 520,
+        y = 10,
+        fontSize = 32,
+        textColor = color_blue,
+        [en] = "R",
+        [ru] = "Р",
+    },
+    lang = {
+        x = 20,
+        y = 33,
+        fontSize = 40,
+        textColor = color_blue,
+        [en] = "*",
+        [ru] = "*",
+    },
+    langl = {
+        x = 51,
+        y = 51,
+        fontSize = 40,
+        textColor = color_blue,
+        [en] = "Language:",
+        [ru] = "Язык:",
+    },
 }
 
 backbtn = {
@@ -346,7 +579,11 @@ backbtn = {
     scPlay = {
         x = 408,
         y = 663,
-    }
+    },
+    scCampaign = {
+        x = 51,
+        y = 816,
+    },
 }
 
 keylines = {
@@ -374,6 +611,156 @@ function getText(value)
     return text;
 end
 
+function myLenght(str)
+    str = "" .. str;
+
+    str = string.gsub(str, string.char(208), "");
+    str = string.gsub(str, string.char(209), "");
+
+    return #str;
+end
+
+function mySub(str, begin, last)
+    str = "" .. str;
+
+    local result = "";
+
+    local i, p1, p2, pos = 0, 0, 0, 0;
+    local c1, c2 = "", "";
+    while i <= #str do
+        i = i + 1;
+        pos = pos + 1;
+
+        p1, p2 = i, i;
+        c1 = str:sub(i,i);
+
+        -- print("mySub_B", i, pos, begin, last, string.byte(c1))
+
+        if string.byte(c1) == 208 or string.byte(c1) == 209 then
+            p2 = i + 1; i = p2;
+        end
+
+        if pos >= begin and pos <= last then
+            result = result .. str:sub(p1, p2);
+        end
+
+        -- print("mySub_A", i, pos, p1, p2, result, result:byte(1, #result))
+    end
+
+    -- print("mySub", begin, last, #str, str, "result " .. result:byte(1, #result));
+
+    return result;
+end
+
+function myUpper(str)
+    str = "" .. str;
+
+    local result = "";
+
+    for i=1, myLenght(str) do
+        local cur = mySub(str, i, i);
+
+        if #cur == 1 then
+            result = result .. cur:upper();
+        else
+            local c1 = cur:sub(1,1):byte();
+            local c2 = cur:sub(2,2):byte();
+
+            if (c1 == 208 and c2 >= 176 and c2 <= 191)
+                or (c1 == 209 and c2 >= 128 and c2 <= 143) then
+                if c1 == 208 then
+                    result = result .. string.char(208) .. string.char(c2 - 32);
+                else
+                    result = result .. string.char(208) .. string.char(c2 + 32);
+                end
+            else
+                result = result .. cur;
+            end
+        end
+    end
+
+    return result;
+end
+
+function myLower(str)
+    str = "" .. str;
+
+    local result = "";
+
+    for i=1, myLenght(str) do
+        local cur = mySub(str, i, i);
+
+        if #cur == 1 then
+            result = result .. cur:lower();
+        else
+            local c1 = cur:sub(1,1):byte();
+            local c2 = cur:sub(2,2):byte();
+
+            if (c1 == 208 and c2 >= 144 and c2 <= 175) then
+                if c2 > 159 then
+                    result = result .. string.char(209) .. string.char(c2 - 32);
+                else
+                    result = result .. string.char(208) .. string.char(c2 + 32);
+                end
+            else
+                result = result .. cur;
+            end
+        end
+    end
+
+    return result;
+end
+
+function getLetter(word, index)
+    --[[
+    if game_language == ru then
+        local i, ri = 1, 0;
+        while i <= #word do
+            ri = ri + 1;
+
+            if string.sub(word, i, i) ~= " " then
+                if ri == index then
+                    return string.sub(word, i, i + 1);
+                end
+
+                i = i + 2;
+            else
+                if ri == index then
+                    return string.sub(word, i, i);
+                end
+
+                i = i + 1;
+            end
+        end
+    else
+        return string.sub(word, index, index);
+    end
+    ]]--
+
+    -- return string.sub(word, index, index);
+    return mySub(word, index, index);
+end
+
+function getWordLenght(word)
+    --[[
+    local lenght = 0;
+    local subword = string.gsub(word, " ", "");
+
+    if game_language == ru then
+        lenght = #subword * 0.5 + #word - #subword;
+    else
+        lenght = #word;
+    end
+
+    -- print("getWordLenght", word, #word, #subword, lenght)
+
+    return lenght;
+    ]]--
+
+    -- return #word;
+    return myLenght(word);
+end
+
 function getImageSizes(image)
     image = display.newImage(image);
 
@@ -386,16 +773,39 @@ function getImageSizes(image)
     return width, height;
 end
 
+function getStars(steps, steps_min)
+    local text = "*";
+
+    if steps == 0
+        or steps == nil
+        or steps_min == nil then
+        return "";
+    end
+
+    if steps < math.ceil(steps_min * 1.5) then
+        text = "* *";
+    end
+
+    if steps < math.ceil(steps_min * 1.2) then
+        text = "* * *";
+    end
+
+    return text;
+end
+
 function getLevel(params)
     print("start getting level");
 
-    local start, finish = params.start:lower(), params.finish:lower();
+    local start, finish = myLower(params.start), myLower(params.finish);
+    --print(start)
+    --os.setlocale("ru");
+    --print(start)
 
     local db_words = sqlite.open(system.pathForFile(db_name[game_language], system.ResourceDirectory));
 
     local dict = {};
 
-    local sql = "SELECT * FROM dict WHERE length=" .. #start .. ";";
+    local sql = "SELECT * FROM dict WHERE length=" .. myLenght(start) .. ";";
     -- sql = "SELECT * FROM dict;";
 
     local ds = 0;
@@ -404,7 +814,7 @@ function getLevel(params)
         dict[row.word] = row.word:lower();
     end
 
-    print("size of dictionary = " .. ds, start, #start, sql, db_name[game_language]);
+    print("size of dictionary = " .. ds, start, myLenght(start), sql, db_name[game_language]);
 
     local vowels = vowels[game_language];
     local alphabet = alphabet[game_language];
@@ -421,9 +831,10 @@ function getLevel(params)
 
             -- print(p, cur, word);
 
-            for i = 1, #word do
-                local b = word:sub(0, i-1);
-                local e = word:sub(i+1);
+            local lenght = myLenght(word);
+            for i = 1, lenght do
+                local b = mySub(word, 0, i-1);
+                local e = mySub(word, i+1, lenght);
 
                 -- print(word, b, e);
 
@@ -469,6 +880,30 @@ function getLevel(params)
         end
         ]]--
 
+        function SortPartition(arr, bIndex, eIndex)
+            local rIndex = math.random(bIndex, eIndex)
+            arr[rIndex], arr[eIndex] = arr[eIndex], arr[rIndex]
+            local i, j = bIndex-1, bIndex
+            while j < eIndex do
+                if arr[j].fitness > arr[eIndex].fitness then
+                    i = i + 1
+                    result[i], result[j] = result[j], result[i]
+                end
+                j = j + 1
+            end
+            result[i+1], result[eIndex] = result[eIndex], result[i+1]
+            return i+1
+        end
+
+        function QuickSort(arr, bIndex, eIndex)
+            local mid = SortPartition(arr, bIndex, eIndex)
+            if bIndex < mid then
+                QuickSort(arr, bIndex, mid-1)
+            end
+            if mid < eIndex then
+                QuickSort(arr, mid+1, eIndex) end
+        end
+
         local function sortTable(tbl)
             print("select sort start", "ts = " .. #tbl, "st = " .. os.time());
 
@@ -501,8 +936,11 @@ function getLevel(params)
             print("select sort finish", "ts = " .. #tbl, "st = " .. os.time());
         end
 
-        -- sort result by fitness
-        sortTable(result);
+        print("quick sort finish", "ts = " .. #result, "s= " .. os.time());
+        if #result > 1 then
+            QuickSort(result, 1, #result);
+        end
+        print("quick sort finish", "ts = " .. #result, "f= " .. os.time());
 
         print("select cut", "rs = " .. #result, "st = " .. os.time());
 
@@ -538,8 +976,8 @@ function getLevel(params)
         local word = cur.name;
 
         for l = 1, #word do
-            local ch = word:sub(l, l);
-            local chF = finish:sub(l, l);
+            local ch = mySub(word, l, l);
+            local chF = mySub(finish, l, l);
             local chV = isVowel(ch);
             local chFV = isVowel(chF);
 
@@ -564,7 +1002,7 @@ function getLevel(params)
             local parent_name = current.parent.name;
 
             for l = 1, #word do
-                if word:sub(l, l) ~= parent_name:sub(l, l) then
+                if mySub(word, l, l) ~= mySub(parent_name, l, l) then
                     mis = mis + 1;
                 end
             end
@@ -586,6 +1024,7 @@ function getLevel(params)
     print("first population size is " .. #population)
 
     while (index <= max_level and #population > 0) do
+        print("selection", index, population[1].name, finish)
         if (population[1].name == finish) then
             child = population[1];
             break;
@@ -606,5 +1045,5 @@ function getLevel(params)
         print(k, v);
     end
 
-    return #result;
+    return #result - 1;
 end

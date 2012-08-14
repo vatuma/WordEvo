@@ -42,7 +42,7 @@ function Keyboard:new(params)
     local paddingV = 3;
 
     local keylines = values.keylines;
-    local language = values.language;
+    local language = values.game_language;
 
     -- define max length of keyboard line
     local hlength = 0;
@@ -76,7 +76,7 @@ function Keyboard:new(params)
 
             keyline:insert(widget.newButton{
                 id = k .. countV .. countH,
-                label = string.upper(v1),
+                label = v1,
                 left = countH * (paddingH + width) + paddingH + display.screenOriginX + paddingC,
                 top = top,
                 width = width,
