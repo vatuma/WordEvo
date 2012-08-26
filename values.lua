@@ -9,7 +9,6 @@
 module(..., package.seeall);
 
 local sqlite = require("sqlite3");
--- os.setlocale("Russian_Russia.1251");
 
 -- scaling
 cell = 51;
@@ -17,6 +16,8 @@ scale = 1;
 main_height = 1024;
 wordmodule_x = 51;
 wordmodule_y = 153;
+wordmodule_scroll = 3;
+
 wordmodule_width = 612;
 wordmodule_height = 459;
 
@@ -42,8 +43,8 @@ tblcampaign = "wmcampaign";
 tblsingleplay = "wmsingleplay";
 
 -- genetic algorithm
-max_level = 10;
-max_population = 50;
+max_level = 50;
+max_population = 100;
 
 start_line = 1;
 finish_line = 11;
@@ -60,7 +61,7 @@ vowels = {
 
 demo = {
     [en] = {{"1", "M", "A", "K", "E"}, {"2", "M", "A", "R", "E"}, {"3", "M", "E", "R", "E"}, {"4", "M", "E", "R", "L"}, {"5"}, {"6"}, {"7"}, {"8"}, {"9"}, {"10"}, {"11", "D", "E", "A", "L"}},
-    [ru] = {},
+    [ru] = {{"1", "М", "У", "Х", "А"}, {"2", "М", "У", "К", "А"}, {"3", "Р", "У", "К", "А"}, {"4", "Р", "У", "Д", "А"}, {"5"}, {"6"}, {"7"}, {"8"}, {"9"}, {"10"}, {"11", "С", "Л", "О", "Н"}},
 }
 
 -- font and colors
@@ -92,7 +93,26 @@ demo_scheme = {
         {act = "change", row = 4, col = 5, text = "L", delay = 5500},
         {act = "select", row = 4, col = 5, color = color_blue, delay = 6000},
     },
-    [ru] = {},
+    [ru] = {
+        {act = "visible", row = 2, cols = 5, visible = false},
+        {act = "visible", row = 3, cols = 5, visible = false},
+        {act = "visible", row = 4, cols = 5, visible = false},
+        {act = "change", row = 2, col = 4, text = "Х", delay = 500},
+        {act = "visible", row = 2, cols = 5, visible = true, delay = 500},
+        {act = "select", row = 2, col = 4, color = color_red, delay = 1000},
+        {act = "change", row = 2, col = 4, text = "К", delay = 1500},
+        {act = "change", row = 3, col = 2, text = "М", delay = 2000},
+        {act = "visible", row = 3, cols = 5, visible = true, delay = 2000},
+        {act = "select", row = 2, col = 4, color = color_blue, delay = 2500},
+        {act = "select", row = 3, col = 2, color = color_red, delay = 3000},
+        {act = "change", row = 3, col = 2, text = "Р", delay = 3500},
+        {act = "change", row = 4, col = 4, text = "К", delay = 4000},
+        {act = "visible", row = 4, cols = 5, visible = true, delay = 4000},
+        {act = "select", row = 3, col = 2, color = color_blue, delay = 4500},
+        {act = "select", row = 4, col = 4, color = color_red, delay = 5000},
+        {act = "change", row = 4, col = 4, text = "Д", delay = 5500},
+        {act = "select", row = 4, col = 4, color = color_blue, delay = 6000},
+    },
 }
 
 buttons = {
@@ -401,7 +421,7 @@ labels = {
         [ru] = "дубль",
         image = "images/ic_duplicate.png",
     },
-    wm_goback = {
+    wm_origin = {
         x = 408,
         y = 306,
         fontSize = 32,
@@ -512,7 +532,7 @@ labels = {
         [ru] = "0",
     },
     lallchains = {
-        x = 102,
+        x = 51,
         y = 153,
         fontSize = 36,
         textColor = color_blue,
@@ -683,6 +703,7 @@ function myUpper(str)
 end
 
 function myLower(str)
+    print("myLower " .. str);
     str = "" .. str;
 
     local result = "";
@@ -797,9 +818,6 @@ function getLevel(params)
     print("start getting level");
 
     local start, finish = myLower(params.start), myLower(params.finish);
-    --print(start)
-    --os.setlocale("ru");
-    --print(start)
 
     local db_words = sqlite.open(system.pathForFile(db_name[game_language], system.ResourceDirectory));
 

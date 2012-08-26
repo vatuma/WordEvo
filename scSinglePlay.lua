@@ -12,6 +12,7 @@ local storyboard = require("storyboard");
 local scene = storyboard.newScene();
 
 local ui = require("ui")
+local ads = require("ads");
 local values = require("values");
 local sqlite = require("sqlite3");
 local preference = require("save_and_load_library_from_satheesh");
@@ -268,6 +269,12 @@ local function selectModule(params)
                     v:setDefault(true);
                 else
                     v:setDefault(false);
+                end
+
+                if k ~= "type_own"
+                    and self.parent.detailsline ~= nil
+                    and self.parent.detailsline.type_own ~= nil then
+                    self.parent.detailsline.type_own.wordmodule:onReady();
                 end
             end
         end
@@ -604,6 +611,7 @@ local function selectModule(params)
                 self:insert(self.finish);
 
                 self:showKeyboard(params.show);
+                scene.screen.back.isVisible = not params.show;
             end
 
             function wm:receiveLetter(letter)
@@ -634,11 +642,24 @@ local function selectModule(params)
                 btn_play.isVisible = not show;
             end
 
+            function wm:onReady()
+                self:showKeyboard(false);
+                self.selected = 0;
+                self:updateColors{show = false};
+
+                preference.save{
+                    ["start_own" .. values.game_language] = self.ws,
+                    ["finish_own" .. values.game_language] = self.wf};
+            end
+
             -- touch on Ready button (label)
             local function onEvent(event)
                 local target = event.target;
 
                 if ("ended" == event.phase) then
+                    target.parent:onReady();
+
+                    --[[
                     target.parent:showKeyboard(false);
                     target.parent.selected = 0;
                     target.parent:updateColors{show = false};
@@ -646,6 +667,7 @@ local function selectModule(params)
                     preference.save{
                         ["start_own" .. values.game_language] = target.parent.ws,
                         ["finish_own" .. values.game_language] = target.parent.wf};
+                    ]]--
                 end
 
                 return true;
@@ -706,7 +728,6 @@ function scene:createScene(event)
     print("scSinglePlay", "createScene");
 
     display.setStatusBar(display.HiddenStatusBar);
-    --os.setlocale("Russian_Russia.1251");
 
     scene.screen = display.newGroup();
 
@@ -739,6 +760,9 @@ function scene:createScene(event)
 
     scene.screen.lang = ui.myLanguage(self);
     scene.screen:insert(scene.screen.lang);
+
+    ads.init("inmobi", "123");
+    ads.show("banner320x48", {x = 0, y = display.viewableContentHeight - 48, interval = 5, testMode = true});
 end
 
 function scene:enterScene(event)
@@ -775,10 +799,24 @@ local function onSystemEvent(event)
     end
 end
 
+local function onKeyEvent(event)
+    local keyname = event.keyName;
+
+    if event.phase == "up"
+        and event.keyName == "back" then
+        storyboard.gotoScene("scStart");
+    end
+
+    return true;
+end
+
 scene:addEventListener("createScene", scene);
 scene:addEventListener("enterScene", scene);
 scene:addEventListener("exitScene", scene);
 
 Runtime:addEventListener("system", onSystemEvent);
+
+if system.getInfo("platformName") == "Android" then
+    Runtime:addEventListener("key", onKeyEvent) end
 
 return scene;

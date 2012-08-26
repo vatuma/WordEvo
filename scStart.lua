@@ -11,7 +11,6 @@ local scene = storyboard.newScene();
 
 local ui = require("ui")
 local values = require("values");
-local widget = require("widget");
 local sqlite = require("sqlite3");
 local preference = require("save_and_load_library_from_satheesh");
 
@@ -134,7 +133,7 @@ local function onBtnCampaignRelease()
         break;
     end
 
-    print("onBtnCampaignRelease", count, sql)
+    -- print("onBtnCampaignRelease", count, sql)
 
     -- new or stored game
     if (count == 0) then
@@ -284,7 +283,7 @@ local function demo()
     local d = display.newGroup();
 
     local row, column = 0, 0;
-    for k,v in pairs(values.demo[values.game_language]) do
+    for k,v in pairs(values.demo[values.language]) do
         column = 0;
         row = row + 1;
 
@@ -301,7 +300,7 @@ local function demo()
     end
 
     local function animate()
-        for k,v in pairs(values.demo_scheme[values.game_language]) do
+        for k,v in pairs(values.demo_scheme[values.language]) do
             local act = v.act;
             local col = v.col or 0;
             local delay = v.delay or 0;
@@ -335,12 +334,14 @@ function scene:createScene(event)
     local ui_language = system.getPreference("ui", "language");
 
     for k,v in pairs(values.language_name) do
-        print(k, v, ui_language)
+        -- print(k, v, ui_language)
         if v == ui_language then
             values.language = k;
             break;
         end
     end
+
+    values.language = values.ru;
 
     values.game_language = preference.getValue("game_language") or values.en;
 
@@ -358,7 +359,7 @@ function scene:createScene(event)
     -- print("scalex", "scaley", scalex, scaley)
 
     screen = display.newGroup();
-    ui.toast{text = "" .. values.language};
+    -- ui.toast{text = "" .. values.language};
 
     dbInit();
     updateInterest();
@@ -482,7 +483,7 @@ function scene:createScene(event)
     playMask.x = offsetW;
     playMask.y = offsetH;
 
-    print(stroke, pmwidth, pmheight, playMask.width, playMask.height)
+    -- print(stroke, pmwidth, pmheight, playMask.width, playMask.height)
 
     display.save(playMask, "playMask.jpg",  system.TemporaryDirectory);
 

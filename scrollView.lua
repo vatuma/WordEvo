@@ -169,24 +169,35 @@ function new(params)
         	        
 	    return true
 	end
-	
-	function scrollView:moveScrollBar()
-		if self.scrollBar then						
-			local scrollBar = self.scrollBar
-			
-			scrollBar.y = -self.y*self.yRatio + scrollBar.height*0.5 + self.top
-			
-			if scrollBar.y <  5 + self.top + scrollBar.height*0.5 then
-				scrollBar.y = 5 + self.top + scrollBar.height*0.5
-			end
-			if scrollBar.y > screenH - self.bottom  - 5 - scrollBar.height*0.5 then
-				scrollBar.y = screenH - self.bottom - 5 - scrollBar.height*0.5
-			end
-			
-		end
-	end
 
-	function trackVelocity(event) 	
+    function scrollView:moveScrollBar()
+        if self.scrollBar then
+            local scrollBar = self.scrollBar
+
+            -- scrollBar.y = -self.y * self.yRatio + scrollBar.height * 0.5 + self.top
+            scrollBar.y = -(self.y - self.top) * self.yRatio + scrollBar.height * 0.5 + self.top
+
+            -- print("scrollBar bef = " .. scrollBar.y, "self top = " .. self.top, "self y = " .. self.y, "self bottom = " .. self.bottom)
+
+            if scrollBar.y < 5 + self.top + scrollBar.height * 0.5 then
+                -- scrollBar.y = 5 + self.top + scrollBar.height*0.5
+                scrollBar.y = self.top + scrollBar.height * 0.5
+            end
+
+            -- print("scrollBar mid = " .. scrollBar.y)
+
+            if scrollBar.y > screenH - self.bottom - 5 - scrollBar.height * 0.5 then
+                -- scrollBar.y = screenH - self.bottom - 5 - scrollBar.height*0.5
+                scrollBar.y = screenH - self.bottom - scrollBar.height * 0.5
+            end
+
+            -- print("scrollBar aft = " .. scrollBar.y)
+
+            -- scrollBar.y = 100 + scrollBar.height * 0.5;
+        end
+    end
+
+    function trackVelocity(event)
 		local timePassed = event.time - scrollView.prevTime
 		scrollView.prevTime = scrollView.prevTime + timePassed
 	
@@ -202,45 +213,49 @@ function new(params)
 	scrollView:addEventListener( "touch", scrollView )
 	
 	function scrollView:addScrollBar(r,g,b,a)
-		if self.scrollBar then self.scrollBar:removeSelf() end
+        if self.scrollBar then self.scrollBar:removeSelf() end
 
-		local scrollColorR = r or 0
-		local scrollColorG = g or 0
-		local scrollColorB = b or 0
-		local scrollColorA = a or 120
-						
-		local viewPortH = screenH - self.top - self.bottom 
-		local scrollH = viewPortH*self.height/(self.height*2 - viewPortH)
+        local scrollColorR = r or 0
+        local scrollColorG = g or 0
+        local scrollColorB = b or 0
+        local scrollColorA = a or 120
 
-        -- print("ADD SCROLL BAR", viewPortH, screenH, scrollH, self.top, self.bottom, self.height)
+        local viewPortH = screenH - self.top - self.bottom
+        -- local scrollH = viewPortH * self.height / (self.height * 2 - viewPortH)
+        local scrollH = math.max(viewPortH * (viewPortH / self.height), 25);
 
-		-- local scrollBar = display.newRoundedRect(viewableScreenW-8,0,5,scrollH,2)
-        local scrollBar = display.newRoundedRect(offsetScroll + display.screenOriginX,0,5,scrollH,2)
+        print("ADD SCROLL BAR", viewPortH, screenH, scrollH, self.top, self.bottom, self.height)
+
+        -- local scrollBar = display.newRoundedRect(viewableScreenW-8,0,5,scrollH,2)
+        local scrollBar = display.newRoundedRect(offsetScroll + display.screenOriginX, 0, 5, scrollH, 2)
         scrollBar:setFillColor(scrollColorR, scrollColorG, scrollColorB, scrollColorA)
 
-		local yRatio = scrollH/self.height
-		self.yRatio = yRatio		
+        -- local yRatio = scrollH / self.height
+        local yRatio = scrollH / viewPortH
+        self.yRatio = yRatio
 
-		scrollBar.y = scrollBar.height*0.5 + self.top
+        print("yRatio = " .. yRatio)
 
-		self.scrollBar = scrollBar
+        scrollBar.y = scrollBar.height * 0.5 + self.top
 
-		transition.to(scrollBar,  { time=400, alpha=0 } )			
-	end
+        self.scrollBar = scrollBar
+
+        transition.to(scrollBar, { time = 400, alpha = 0 })
+    end
 
 	function scrollView:removeScrollBar()
-		if self.scrollBar then 
-			self.scrollBar:removeSelf() 
-			self.scrollBar = nil
-		end
-	end
+        if self.scrollBar then
+            self.scrollBar:removeSelf()
+            self.scrollBar = nil
+        end
+    end
 	
 	function scrollView:cleanUp()
         Runtime:removeEventListener("enterFrame", trackVelocity)
-		Runtime:removeEventListener( "touch", scrollView )
-		Runtime:removeEventListener("enterFrame", scrollView ) 
-		scrollView:removeScrollBar()
-	end
+        Runtime:removeEventListener("touch", scrollView)
+        Runtime:removeEventListener("enterFrame", scrollView)
+        scrollView:removeScrollBar()
+    end
 	
 	return scrollView
 end

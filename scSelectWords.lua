@@ -31,7 +31,6 @@ end
 
 function scene:createScene(event)
     display.setStatusBar(display.HiddenStatusBar);
-    -- os.setlocale("Russian_Russia.1251");
 
     local name;
 

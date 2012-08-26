@@ -38,8 +38,8 @@ function Keyboard:new(params)
     image:removeSelf();
     image = nil;
 
-    local paddingH = 3;
-    local paddingV = 3;
+    local paddingH = 1;
+    local paddingV = 1;
 
     local keylines = values.keylines;
     local language = values.game_language;
@@ -76,12 +76,12 @@ function Keyboard:new(params)
 
             keyline:insert(widget.newButton{
                 id = k .. countV .. countH,
-                label = v1,
+                label = values.myUpper(v1),
                 left = countH * (paddingH + width) + paddingH + display.screenOriginX + paddingC,
                 top = top,
                 width = width,
                 height = height,
-                font = "Vatuma Script slc",
+                font = values.font,
                 fontSize = 40 * scale,
                 default = "images/kbd_button.png",
                 over = "images/kbd_key_pressed.png",
