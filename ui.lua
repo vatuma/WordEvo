@@ -182,18 +182,21 @@ function myButton(params)
     local onRelease = params.onRelease;
 
     local v = values.buttons[id];
+    local textColor = v.textColor;
+
+    if params.textColor then
+        textColor = params.textColor; end;
 
     local btn = widget.newButton{
         id = id,
         label = values.getText(v),
-        left = v.x * scale + display.screenOriginX,
-        top = v.y * scale + display.screenOriginY,
+        left = v.x * scale + offsetW,
+        top = v.y * scale + offsetH,
         width = width,
         height = height,
         font = values.font,
         fontSize = v.fontSize * scale,
-        -- labelColor = {v.textColor[1], v.textColor[2], v.textColor[3]},
-        labelColor = {255, 255, 0, 255},
+        labelColor = { default = { textColor[1], textColor[2], textColor[3], 255 }, over = { textColor[1], textColor[2], textColor[3], 255 } },
         default = v.default,
         over = v.over,
         onRelease = onRelease

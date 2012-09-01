@@ -49,6 +49,11 @@ max_population = 100;
 start_line = 1;
 finish_line = 11;
 
+version = {
+    [en] = "ver. 1.0",
+    [ru] = "вер. 1.0",
+}
+
 alphabet = {
     [en] = {"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "u", "v", "w", "t", "x", "y", "z"},
     [ru] = {"а", "б", "в", "г", "д", "е", "ё", "ж", "з", "и", "й", "к", "л", "м", "н", "о", "п", "р", "с", "т", "у", "ф", "х", "ц", "ч", "ш", "щ", "ь", "ы", "ъ", "э", "ю", "я"},
@@ -153,6 +158,16 @@ buttons = {
         textColor = color_blue,
         default = "images/btn_border_4.png",
         over = "images/btn_border_4_pressed.png",
+        [en] = "Results",
+        [ru] = "Результаты",
+    },
+    results_off = {
+        x = 344,
+        y = 592,
+        fontSize = 40,
+        textColor = color_grey,
+        default = "images/btn_border_grey_1.png",
+        over = "images/btn_border_grey_1.png",
         [en] = "Results",
         [ru] = "Результаты",
     },
@@ -275,6 +290,26 @@ buttons = {
         textColor = color_blue,
         [en] = "Close",
         [ru] = "Закрыть",
+    },
+    about_close = {
+        x = 192,
+        y = 847,
+        default = "images/btn_border_1.png",
+        over = "images/btn_border_1_pressed.png",
+        fontSize = 40,
+        textColor = color_blue,
+        [en] = "Close",
+        [ru] = "Закрыть",
+    },
+    our_games = {
+        x = 346,
+        y = 333,
+        default = "images/btn_border_1.png",
+        over = "images/btn_border_1_pressed.png",
+        fontSize = 40,
+        textColor = color_blue,
+        [en] = "Our games",
+        [ru] = "Наши игры",
     },
 }
 
@@ -515,7 +550,15 @@ labels = {
         [en] = "Results",
         [ru] = "Результаты",
     },
-    start_results = {
+    title_about = {
+        x = 0,
+        y = 0,
+        fontSize = 60,
+        textColor = color_blue,
+        [en] = "About",
+        [ru] = "О программе",
+    },
+    title_start = {
         x = 0,
         y = 0,
         fontSize = 60,
@@ -586,6 +629,22 @@ labels = {
         textColor = color_blue,
         [en] = "Language:",
         [ru] = "Язык:",
+    },
+    about_name = {
+        x = 51,
+        y = 153,
+        fontSize = 40,
+        textColor = color_blue,
+        [en] = "WORDEVO",
+        [ru] = "МУХОСЛОН",
+    },
+    weblink = {
+        x = 0,
+        y = 585,
+        fontSize = 40,
+        textColor = color_blue,
+        [en] = "www.VatumaGames.com",
+        [ru] = "www.VatumaGames.com",
     },
 }
 

@@ -38,8 +38,8 @@ function Keyboard:new(params)
     image:removeSelf();
     image = nil;
 
-    local paddingH = 1;
-    local paddingV = 1;
+    local paddingH = 0;
+    local paddingV = 0;
 
     local keylines = values.keylines;
     local language = values.game_language;

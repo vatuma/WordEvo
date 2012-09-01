@@ -193,20 +193,9 @@ local function onBtnRulesRelease()
         return false;
     end;
 
-    --[[
-    local options =
-    {
-        params = {
-            start = "line",
-            finish = "like",
-            gametype = values.type_singleplay,
-        }
-    }
+    storyboard.gotoScene("scRules");
 
-    storyboard.gotoScene("scPlay", options);
-    ]]--
-
-    ui.toast{text = "не реализовано"};
+    -- ui.toast{text = "не реализовано"};
 
     return true;
 end
@@ -235,6 +224,16 @@ local function onBtnResultsRelease()
     ]]--
 
     return true;
+end
+
+local function onLogoEvent(event)
+    if receiveButtonEvents == false then
+        return false;
+    end;
+
+    if event.phase == "ended" then
+        storyboard.gotoScene("scAbout");
+    end
 end
 
 -- -- now the magic
@@ -371,15 +370,17 @@ function scene:createScene(event)
     screen.logo_small.width, screen.logo_small.height = values.getImageSizes("images/logo_small.png");
     screen.logo_small:setReferencePoint(display.TopLeftReferencePoint);
     screen.logo_small.x, screen.logo_small.y = display.screenOriginX, display.screenOriginY;
+    screen.logo_small:addEventListener("touch", onLogoEvent);
     screen:insert(screen.logo_small);
 
     screen.logo = display.newImage("images/logo.png");
     screen.logo.width, screen.logo.height = values.getImageSizes("images/logo.png");
     screen.logo:setReferencePoint(display.TopLeftReferencePoint);
     screen.logo.x, screen.logo.y = 20 + display.screenOriginX, 335 + display.screenOriginY;
+    screen.logo:addEventListener("touch", onLogoEvent);
     screen:insert(screen.logo);
 
-    screen.title = ui.myText{name = "start_results", refPoint = display.CenterReferencePoint};
+    screen.title = ui.myText{name = "title_start", refPoint = display.CenterReferencePoint};
     screen.title.x = display.viewableContentWidth - (display.viewableContentWidth - 2 * values.cell * values.scale) * 0.5;
     screen.title.y = values.cell * values.scale + display.screenOriginY;
     screen:insert(screen.title);
@@ -426,6 +427,7 @@ function scene:createScene(event)
     }
     screen:insert(screen.rules);
 
+    --[[
     screen.results = ui.myButton{
         id = "results",
         onRelease = onBtnResultsRelease,
@@ -434,6 +436,7 @@ function scene:createScene(event)
         scale = values.scale
     }
     screen:insert(screen.results);
+    ]]--
 
     --[[
     screen.res_start = ui.myText{name = "res_start", refPoint = display.TopLeftReferencePoint};
@@ -570,6 +573,38 @@ function scene:enterScene(event)
     if not db_main or not db_main:isopen() then
         dbInit();
     end
+
+    if screen.result ~= nil then
+        screen:remove(screen.result) end;
+
+    local width, height = values.getImageSizes("images/btn_border_1.png");
+
+    local sql = "SELECT * FROM results;";
+
+    local count = 0;
+    for row in db_main:nrows(sql) do
+        count = count + 1;
+        break;
+    end
+
+    if count == 0 then
+        screen.results = ui.myButton{
+            id = "results_off",
+            width = width,
+            height = height,
+            scale = values.scale
+        }
+    else
+        screen.results = ui.myButton{
+            id = "results",
+            onRelease = onBtnResultsRelease,
+            width = width,
+            height = height,
+            scale = values.scale
+        }
+    end;
+
+    screen:insert(screen.results);
 end
 
 function scene:exitScene(event)

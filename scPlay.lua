@@ -628,7 +628,48 @@ local function wordModule(params)
     end
 
     function module:completeGame()
+        local count = self.active_line.row - 1;
+        local sqlupdate = "";
+        local is_insert = true;
+        local sql = "SELECT * FROM results WHERE start='" .. self.start .. "' AND finish='" .. self.finish .. "';";
 
+        for row in db_main:nrows(sql) do
+            local steps = row.steps;
+
+            if steps > count then
+                sqlupdate = "UPDATE results SET steps=" .. count .. " WHERE start='" .. self.start .. "' AND finish='" .. self.finish .. "';";
+            end
+
+            is_insert = false;
+        end
+
+        if is_insert then
+            sqlupdate = "INSERT INTO results ('start','finish','steps','rated') VALUES ('" .. self.start .. "','" .. self.finish .. "'," .. count .. ",0);";
+        end
+
+        if gametable == values.tblcampaign then
+            sqlupdate = sqlupdate .. "UPDATE OR IGNORE campaign SET steps=" .. count .. " WHERE level=" .. self.level .. " AND language='" .. values.game_language .. "';";
+            sqlupdate = sqlupdate .. "UPDATE OR IGNORE campaign SET enable=" .. 1 .. " WHERE level=" .. self.level + 1 .. " AND language='" .. values.game_language .. "';";
+        end
+
+        sqlupdate = sqlupdate .. "DELETE FROM " .. gametable .. " WHERE language='" .. values.game_language .. "';";
+        db_main:exec(sqlupdate);
+
+        tmain = {};
+
+        local options =
+        {
+            params = {
+                start = self.start,
+                finish = self.finish,
+                level = self.level,
+                steps = count,
+                steps_min = self.steps_min,
+                gametype = gametable,
+            }
+        }
+
+        storyboard:gotoScene("scComplete", options);
     end
 
     -- creating module
