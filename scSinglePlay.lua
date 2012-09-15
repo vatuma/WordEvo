@@ -74,12 +74,33 @@ local function getPlayWords()
             return start, finish;
         end
 
+        local function randomStart()
+            local sp = math.random(1, #dict);
+            local start = dict[sp];
+
+            return start;
+        end
+
+        --[[
         start, finish = startFinish();
         steps_min = values.getLevel{start = start, finish = finish};
+        ]]--
 
+        --[[
         while (steps_min <= 0) do
             start, finish = startFinish();
             steps_min = values.getLevel{start = start, finish = finish};
+        end
+        ]]--
+
+        start = randomStart();
+        steps_min, finish = values.getLevel{start = start, finish = "", random_steps = math.random(5, 20)};
+        print("STEPS_MIN", steps_min, finish);
+
+        while (steps_min <= 0) do
+            start = randomStart();
+            steps_min, finish = values.getLevel{start = start, finish = "", random_steps = math.random(5, 20)};
+            print("STEPS_MIN", steps_min, finish);
         end
 
     elseif (type == "type_interest") then
@@ -98,7 +119,7 @@ local function getPlayWords()
         if #start ~= #finish then
             error = "diffrent lenght of words";
         else
-            steps_min = values.getLevel{start = start, finish = finish};
+            steps_min = values.getLevel{start = start, finish = finish, random_steps = 0};
         end
 
         if (steps_min > 0) then

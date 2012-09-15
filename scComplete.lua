@@ -105,6 +105,7 @@ function scene:createScene(event)
     local params = event.params;
 
     gametype = values.tblsingleplay;
+    dbInit();
 
     if params then
         gametype = params.gametype or values.tblsingleplay;
@@ -136,15 +137,29 @@ function scene:createScene(event)
 
     window:insert(window.back);
 
-    print(window.x, window.y, window.back.x, window.back.y, window.back.width)
+    -- print(window.x, window.y, window.back.x, window.back.y, window.back.width)
 
     -- screen:insert(screen.window);
 
+    local islast = false;
     if gametype == values.tblsingleplay then
         window.completed = ui.myText{name = "complete_singleplay", refPoint = display.TopCenterReferencePoint};
         window:insert(window.completed);
     else
-        window.completed = ui.myText{name = "complete_campaign", refPoint = display.TopCenterReferencePoint};
+        local sql = "SELECT * FROM campaign WHERE language='" .. values.game_language .. "';";
+
+        local islast = true;
+        for row in db_main:nrows(sql) do
+            if row.level == level + 1 then
+                islast = false;
+            end
+        end
+
+        if islast then
+            window.completed = ui.myText{name = "complete_campaign_islast", refPoint = display.TopCenterReferencePoint};
+        else
+            window.completed = ui.myText{name = "complete_campaign", refPoint = display.TopCenterReferencePoint};
+        end
         window:insert(window.completed);
     end
 

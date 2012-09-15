@@ -486,6 +486,14 @@ labels = {
         [en] = "Level completed!",
         [ru] = "Уровень завершен!",
     },
+    complete_campaign_islast = {
+        x = 255,
+        y = 0,
+        fontSize = 40,
+        textColor = color_green,
+        [en] = "Campaign completed!",
+        [ru] = "Кампания завершена!",
+    },
     complete_singleplay = {
         x = 255,
         y = 0,
@@ -874,9 +882,8 @@ function getStars(steps, steps_min)
 end
 
 function getLevel(params)
-    print("start getting level");
-
-    local start, finish = myLower(params.start), myLower(params.finish);
+    local start, finish, random_steps = myLower(params.start), myLower(params.finish) or "", params.random_steps or 0;
+    print("start getting level with", start, finish, random_steps);
 
     local db_words = sqlite.open(system.pathForFile(db_name[game_language], system.ResourceDirectory));
 
@@ -891,13 +898,13 @@ function getLevel(params)
         dict[row.word] = row.word:lower();
     end
 
-    print("size of dictionary = " .. ds, start, myLenght(start), sql, db_name[game_language]);
+    -- print("size of dictionary = " .. ds, start, myLenght(start), sql, db_name[game_language]);
 
     local vowels = vowels[game_language];
     local alphabet = alphabet[game_language];
 
     function mutate(population)
-        print("mutate start", "ps = " .. #population, "st = " .. os.time());
+        -- print("mutate start", "ps = " .. #population, "st = " .. os.time());
 
         local result = {};
         -- print(#population);
@@ -926,13 +933,13 @@ function getLevel(params)
             end
         end
 
-        print("mutate finish", "rs = " .. #result, "st = " .. os.time());
+        -- print("mutate finish", "rs = " .. #result, "st = " .. os.time());
 
         return result;
     end
 
     function select(population, index)
-        print("select start", "ps = " .. #population, "step = " .. index, "st = " .. os.time());
+        -- print("select start", "ps = " .. #population, "step = " .. index, "st = " .. os.time());
 
         local result = {};
         local unique = {};
@@ -949,13 +956,7 @@ function getLevel(params)
             result[#result + 1] = cur;
         end
 
-        print("select unique", "ps = " .. #result, "st = " .. os.time());
-
-        --[[
-        for k,v in pairs(result) do
-            print(k);
-        end
-        ]]--
+        -- print("select unique", "ps = " .. #result, "st = " .. os.time());
 
         function SortPartition(arr, bIndex, eIndex)
             local rIndex = math.random(bIndex, eIndex)
@@ -982,7 +983,7 @@ function getLevel(params)
         end
 
         local function sortTable(tbl)
-            print("select sort start", "ts = " .. #tbl, "st = " .. os.time());
+            -- print("select sort start", "ts = " .. #tbl, "st = " .. os.time());
 
             function comp(a, b)
                 local result = true;
@@ -1010,16 +1011,16 @@ function getLevel(params)
                 end
             until _done
 
-            print("select sort finish", "ts = " .. #tbl, "st = " .. os.time());
+            -- print("select sort finish", "ts = " .. #tbl, "st = " .. os.time());
         end
 
-        print("quick sort finish", "ts = " .. #result, "s= " .. os.time());
+        -- print("quick sort finish", "ts = " .. #result, "s= " .. os.time());
         if #result > 1 then
             QuickSort(result, 1, #result);
         end
-        print("quick sort finish", "ts = " .. #result, "f= " .. os.time());
+        -- print("quick sort finish", "ts = " .. #result, "f= " .. os.time());
 
-        print("select cut", "rs = " .. #result, "st = " .. os.time());
+        -- print("select cut", "rs = " .. #result, "st = " .. os.time());
 
         local result_cutted = {};
         if (#result > max_population) then
@@ -1030,7 +1031,7 @@ function getLevel(params)
             result_cutted = result;
         end
 
-        print("select finish", "rs = " .. #result_cutted, "st = " .. os.time());
+        -- print("select finish", "rs = " .. #result_cutted, "st = " .. os.time());
 
         return result_cutted;
     end
@@ -1100,15 +1101,32 @@ function getLevel(params)
 
     print("first population size is " .. #population)
 
-    while (index <= max_level and #population > 0) do
-        print("selection", index, population[1].name, finish)
-        if (population[1].name == finish) then
-            child = population[1];
-            break;
+    if (random_steps == 0) then
+        while (index <= max_level and #population > 0) do
+            -- print("selection", index, population[1].name, finish)
+
+            if (population[1].name == finish) then
+                child = population[1];
+                break;
+            end
+
+            index = index + 1;
+            population = select(mutate(population), index);
+        end
+    else
+        while (index <= random_steps and #population > 0) do
+            -- print("selection", index, population[1].name, finish)
+
+            index = index + 1;
+            population = select(mutate(population), index);
         end
 
-        index = index + 1;
-        population = select(mutate(population), index);
+        if (index < random_steps) then -- dead population
+            return 0, "";
+        else
+            child = population[1];
+            finish = population[1].name;
+        end
     end
 
     local result = {};
@@ -1122,5 +1140,5 @@ function getLevel(params)
         print(k, v);
     end
 
-    return #result - 1;
+    return #result - 1, finish;
 end

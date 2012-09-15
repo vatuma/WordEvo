@@ -216,6 +216,14 @@ local function wordModule(params)
                 letter.label_off.x, letter.label_off.y = letter.back.width * 0.5, letter.back.height * 0.5;
                 letter.label_off:setTextColor(values.color_grey[1], values.color_grey[2], values.color_grey[3]);
                 letter:insert(letter.label_off);
+
+                letter.label_off_old = display.newText(text, 0, 0, values.font, 10 * 2);
+                letter.label_off_old.xScale = 0.5; letter.label_off_old.yScale = 0.5;
+                letter.label_off_old:setReferencePoint(display.CenterReferencePoint);
+                letter.label_off_old.x, letter.label_off_old.y = letter.back.width * 0.5 + letter.label_off_old.width * 0.5, letter.back.height * 0.5 - letter.label_off_old.height * 0.5;
+                letter.label_off_old:setTextColor(values.color_grey[1], values.color_grey[2], values.color_grey[3]);
+                letter.label_off_old.text = text;
+                letter:insert(letter.label_off_old);
             end
 
             -- change letter label
@@ -236,6 +244,7 @@ local function wordModule(params)
             self.label.isVisible = not self.off;
             self.label_flash.isVisible = not self.off;
             self.label_off.isVisible = self.off;
+            self.label_off_old.isVisible = false;
 
             self.label_flash.isVisible = self.flash;
 
@@ -251,6 +260,12 @@ local function wordModule(params)
                 transition.to(self.label, {time = 2000, alpha = 1});
                 transition.to(self.label_flash, {time = 2000, alpha = 0});
             end
+        end
+
+        function letter:setOffMode(params)
+            local isoff = params.isoff;
+
+            self.label_off_old.isVisible = isoff;
         end
 
         local function onEvent(event)
@@ -536,11 +551,14 @@ local function wordModule(params)
     function module:offWords()
         print("module:offWords", self.active_line.row, self.max_row)
 
+        local isoff = false;
         for i = 2, self.max_row do
             local off = 0;
             if i > self.active_line.row
                 and self.active_line.row < self.max_row then
-                off = 1; end;
+                isoff = true;
+                off = 1;
+            end;
 
             if off ~= tmain["line"][i].off then
                 tmain["line"][i].off = off;
@@ -550,6 +568,8 @@ local function wordModule(params)
             self.clear.isVisible = self.active_line.row < self.max_row;
             self.clear.y = self.active_line.y;
         end
+
+        self.active_letter:setOffMode{isoff = isoff};
     end
 
     function module:showDuplicate(word)
