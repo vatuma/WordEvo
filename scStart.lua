@@ -316,8 +316,8 @@ local function demo()
         end
     end
 
-    timer.performWithDelay(0, animate, 1);
-    timer.performWithDelay(7000, animate, 0);
+    --timer.performWithDelay(0, animate, 1);
+    --timer.performWithDelay(7000, animate, 0);
 
     return d;
 end
@@ -566,9 +566,6 @@ function scene:enterScene(event)
     receiveButtonEvents = true;
 
     storyboard.purgeScene(storyboard.getPrevious());
-    if storyboard.getPrevious() == "scPlay" then
-        storyboard.removeScene("scPlay");
-    end
 
     if not db_main or not db_main:isopen() then
         dbInit();
@@ -615,6 +612,9 @@ function scene:exitScene(event)
     if db_main and db_main:isopen() then
         db_main:close();
     end
+
+    display.remove(screen);
+    screen = nil;
 end
 
 local function onSystemEvent(event)

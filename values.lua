@@ -770,7 +770,7 @@ function myUpper(str)
 end
 
 function myLower(str)
-    print("myLower " .. str);
+    -- print("myLower " .. str);
     str = "" .. str;
 
     local result = "";
